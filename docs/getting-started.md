@@ -8,7 +8,7 @@ Use macOS 13 ou posterior com Xcode Command Line Tools. Se as ferramentas ainda 
 xcode-select --install
 ```
 
-A validação real disponível cobre Apple Silicon e macOS 26. O requisito mínimo de build não equivale a uma matriz completa de compatibilidade testada.
+Build e testes com fixtures passaram em Apple Silicon no macOS 14 e 15 pelo GitHub Actions, e no macOS 26 localmente. macOS 13 e Macs Intel ainda não foram validados em execução.
 
 ## Testar, instalar e abrir
 
@@ -17,7 +17,6 @@ Na raiz do repositório:
 ```sh
 ./scripts/test.sh
 ./scripts/install.sh
-open "$HOME/Applications/PlanMeter.app"
 ```
 
 O destino padrão é `~/Applications/PlanMeter.app`. Compilar e instalar são ações distintas. Use o aplicativo instalado para o uso diário.
