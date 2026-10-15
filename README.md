@@ -20,7 +20,7 @@ O cache do Claude Code se renova quando há atividade no Claude Code. Atualizar 
 
 ## Instalação a partir do código
 
-Requisitos: macOS 13 ou posterior, Xcode Command Line Tools, Python 3 e Git. A validação real realizada até agora cobre Apple Silicon com macOS 26. Outras versões e Macs Intel ainda precisam de validação.
+Requisitos: macOS 13 ou posterior, Xcode Command Line Tools, Python 3 e Git. Build e testes com fixtures passaram em Apple Silicon no macOS 14 e 15 pelo GitHub Actions, e no macOS 26 localmente. macOS 13 e Macs Intel ainda não foram validados em execução.
 
 ```sh
 git clone https://github.com/pcarielo/planmeter.git
@@ -40,6 +40,23 @@ O aplicativo ainda não tem assinatura Developer ID nem notarização. O build l
 - **Z.ai:** abra o menu do aplicativo e escolha a opção de configurar a chave. O prompt seguro grava a chave no Keychain do macOS.
 
 Veja os [primeiros passos](docs/getting-started.md), os [detalhes de cada provedor](docs/providers.md) e as [instruções para um agente ajudar na instalação](docs/agent-setup.md).
+
+## Peça ao seu agente
+
+Você pode copiar este pedido. O agente deve confirmar a instalação e deixar o início automático desligado, a menos que você escolha ativá-lo.
+
+```yaml
+tarefa: Instalar e configurar o PlanMeter no meu Mac
+repositorio: https://github.com/pcarielo/planmeter
+instrucoes:
+  - Leia AGENTS.md e docs/agent-setup.md antes de executar comandos.
+  - Verifique os requisitos e rode o diagnóstico e os testes com fixtures.
+  - Instale em ~/Applications/PlanMeter.app, sem habilitar início automático.
+  - Preserve minhas configurações e minha statusline do Claude Code.
+  - Oriente o cadastro da chave Z.ai pelo prompt seguro do aplicativo.
+  - Não peça chaves no chat nem crie sessões de modelo para testar quotas.
+  - Informe o que foi validado e o que ainda precisa da minha participação.
+```
 
 ## Dados e segurança
 
