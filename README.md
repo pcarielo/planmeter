@@ -6,6 +6,28 @@ O PlanMeter é um aplicativo Swift/AppKit que mostra o saldo disponível, as jan
 
 ![Exemplo com ícones de iniciais e valores fictícios](docs/images/statusbar.png)
 
+## Painel de quotas
+
+Clique no indicador para abrir o painel completo. Só aparecem provedores com percentuais válidos, tanto na barra quanto no painel. Saldo de **0%** continua visível. Se nenhuma métrica estiver disponível, a barra mostra apenas **PlanMeter**, mantendo o acesso à configuração.
+
+![Painel completo com dados fictícios e ícones de iniciais](docs/images/dashboard.png)
+
+- **Atualizar** solicita novas leituras, respeitando os intervalos de cada provedor.
+- **Fixar** mantém a janela aberta e permite movê-la pela faixa superior. **Desafixar** reativa o fechamento após 15 segundos.
+- **1×, 1,25× e 1,5×** ajustam o tamanho.
+- **Acessos** reúne configuração de chaves e instruções de autenticação.
+- **×** fecha o painel. Sem fixar, um clique no conteúdo também o fecha; os controles continuam utilizáveis.
+
+Uma falha de consulta preserva a última métrica conhecida, marcada como desatualizada. Isso não significa que uma nova leitura tenha sido concluída.
+
+## Aviso de reset
+
+Quando o histórico permite confirmar uma renovação de quota, o aplicativo mostra um aviso com confete. O alerta pode ser dispensado pelo indicador da barra. O histórico registra a detecção, não um reset executado pelo aplicativo.
+
+![Aviso de reset com evento simulado, sem alteração de quota real](docs/images/reset.png)
+
+As imagens usam dados fictícios. O aviso acima foi capturado na interface real com um evento simulado; nenhum reset ou consumo de modelo foi executado para produzi-lo.
+
 ## Como funciona
 
 | Provedor | Fonte | Preparação |
@@ -16,7 +38,7 @@ O PlanMeter é um aplicativo Swift/AppKit que mostra o saldo disponível, as jan
 | Kimi Code | Endpoint de uso do Coding Plan | Cadastrar a chave Kimi Code no Keychain pelo menu |
 | Grok Unified | Consulta de quota pelo Grok Build oficial | Instalar o cliente e autenticar a assinatura com `grok login` |
 
-O build padrão obtém os favicons dos sites dos provedores e os guarda somente no build local. Para usar ícones próprios sem esse download, execute `PLANMETER_ICON_MODE=initials ./scripts/install.sh`. Os ícones identificam os provedores na barra de menus. O clique principal abre um painel flutuante com cartões dos provedores que têm métricas. Sem fixar, ele fecha após 15 segundos ou ao clicar no conteúdo. Os controles permitem atualizar, fixar ou desafixar e escolher 1×, 1,25× ou 1,5×. Fixado, permanece aberto e pode ser movido pela faixa superior. O clique direito abre as configurações. O painel mostra o detalhe das quotas, incluindo as janelas de 5 horas e semanal de Z.ai e Kimi Code. A disponibilidade de cada informação depende do que o provedor retorna.
+O build padrão obtém os favicons dos sites dos provedores e os guarda somente no build local. Para usar ícones de iniciais sem esse download, execute `PLANMETER_ICON_MODE=initials ./scripts/install.sh`. As janelas e previsões de reset dependem das informações retornadas por cada provedor.
 
 O cache do Claude Code se renova quando há atividade no Claude Code. Atualizar o PlanMeter não força uma nova consulta de quota desse provedor.
 
@@ -37,10 +59,15 @@ O aplicativo ainda não tem assinatura Developer ID nem notarização. O build l
 
 ## Configuração dos provedores
 
+Abra **Acessos** no painel ou **Configurar acessos…** no menu de clique direito. Todos os provedores aparecem nessa janela de configuração, inclusive os que ainda não têm métricas. Isso permite conectar uma conta sem encher a barra de indicadores vazios.
+
+Z.ai e Kimi abrem o cadastro seguro de chave no Keychain. Codex, Claude e Grok oferecem instruções, comando copiável e guia de configuração. O aplicativo não executa logins nem altera configurações de terceiros automaticamente.
+
 - **Codex:** use uma instalação oficial do Codex CLI já autenticada. O aplicativo procura o executável no `PATH` e em locais comuns. Um caminho explícito pode ser definido em `codexPath` no arquivo de configuração local.
 - **Claude Code:** execute `python3 scripts/configure-claude.py --check` para inspecionar a configuração. Depois, `python3 scripts/configure-claude.py --apply` configura o helper com backup e preserva a statusline existente por meio de um wrapper.
 - **Z.ai:** abra o menu do aplicativo e escolha a opção de configurar a chave. O prompt seguro grava a chave no Keychain do macOS.
 - **Kimi Code:** use a chave emitida no console do Coding Plan, não a chave da plataforma Moonshot API. O menu oferece cadastro seguro, remoção e consulta. O OAuth de outros aplicativos não é acessado nem alterado.
+- **Grok Unified:** instale o Grok Build oficial e conclua `grok login`. O PlanMeter consulta a assinatura pelo cliente autenticado, sem copiar tokens.
 
 Veja os [primeiros passos](docs/getting-started.md), os [detalhes de cada provedor](docs/providers.md) e as [instruções para um agente ajudar na instalação](docs/agent-setup.md).
 
@@ -56,14 +83,14 @@ instrucoes:
   - Verifique os requisitos e rode o diagnóstico e os testes com fixtures.
   - Instale em ~/Applications/PlanMeter.app, sem habilitar início automático.
   - Preserve minhas configurações e minha statusline do Claude Code.
-  - Oriente o cadastro da chave Z.ai pelo prompt seguro do aplicativo.
+  - Abra Acessos e oriente os logins e o cadastro de chaves pelos fluxos seguros.
   - Não peça chaves no chat nem crie sessões de modelo para testar quotas.
   - Informe o que foi validado e o que ainda precisa da minha participação.
 ```
 
 ## Dados e segurança
 
-O estado local fica em `~/Library/Application Support/PlanMeter/`. A chave Z.ai fica no Keychain, separada da configuração. O aplicativo não lê credenciais de outros aplicativos para obter essa chave.
+O estado local fica em `~/Library/Application Support/PlanMeter/`. As chaves Z.ai e Kimi ficam no Keychain, separadas da configuração. O aplicativo não lê credenciais de outros aplicativos para obter essas chaves.
 
 As consultas Z.ai automáticas têm intervalo de 15 minutos. A atualização manual respeita um intervalo mínimo de 60 segundos e o tratamento de respostas HTTP 429. Monitorar quotas não autoriza criar sessões de modelo, comprar créditos, alterar planos ou executar resets.
 

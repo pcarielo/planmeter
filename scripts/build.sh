@@ -14,7 +14,7 @@ import pathlib, plistlib, shutil, sys
 root, app=map(pathlib.Path,sys.argv[1:])
 resources=root/'app/Resources'
 if resources.exists(): shutil.copytree(resources,app/'Contents/Resources',dirs_exist_ok=True)
-info={'CFBundleIdentifier':'io.github.pcarielo.planmeter','CFBundleName':'PlanMeter','CFBundleDisplayName':'PlanMeter','CFBundleExecutable':'PlanMeter','CFBundlePackageType':'APPL','CFBundleShortVersionString':'1.2.0','CFBundleVersion':'3','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSHighResolutionCapable':True}
+info={'CFBundleIdentifier':'io.github.pcarielo.planmeter','CFBundleName':'PlanMeter','CFBundleDisplayName':'PlanMeter','CFBundleExecutable':'PlanMeter','CFBundlePackageType':'APPL','CFBundleShortVersionString':'1.3.0','CFBundleVersion':'4','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSHighResolutionCapable':True}
 if (app/'Contents/Resources/AppIcon.icns').exists(): info['CFBundleIconFile']='AppIcon'
 with (app/'Contents/Info.plist').open('wb') as f: plistlib.dump(info,f)
 PY

@@ -69,7 +69,7 @@ func runKimiMonitorTests() {
     let presentation=StatusPresentation.make(codex:nil,claude:nil,zai:nil,codexStale:false,claudeStale:false,zaiStale:false,badge:"",kimi:restored.snapshot,kimiStale:false,showKimi:true)
     check(presentation.accessibilityText.contains("Kimi Code 5h 70% · sem 80%"),"distinct accessible windows")
     var icons=0;presentation.title.enumerateAttribute(.attachment,in:NSRange(location:0,length:presentation.title.length)){value,_,_ in if value is NSTextAttachment {icons += 1}}
-    check(icons==4,"four bundled icons")
+    check(icons==1,"only provider with metrics has an icon")
     var aged=QuotaSnapshot(queriedAt:Date().addingTimeInterval(-300),windows:restored.snapshot!.windows);aged.provider="kimi"
     check(!MenuApp().stale(aged),"Kimi menu uses 15-minute freshness")
     let window=NSWindow(contentRect:NSRect(x:0,y:0,width:400,height:100),styleMask:[.titled],backing:.buffered,defer:false)

@@ -6,6 +6,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let kimi = KimiMonitor()
     let grok = GrokMonitor()
     let dashboard = QuotaDashboard()
+    let accessSetup = AccessSetup()
     var menu = NSMenu()
     var snapshot: QuotaSnapshot?
     var zaiReading: ZaiReading?, zaiSnapshot: QuotaSnapshot?
@@ -119,12 +120,31 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 kimi.snapshot.map {QuotaCard(key:"kimi",name:"Kimi Code",snapshot:$0,stale:kimi.stale)},
                 grok.snapshot.map {QuotaCard(key:"grok",name:$0.bucketID=="grok:unified" ? "Grok Unified" : "Grok",snapshot:$0,stale:grok.stale,note:($0.bucketID=="grok:unified" ? "Quota compartilhada · " : "Assinatura · ") + localDate($0.queriedAt))}
             ].compactMap {$0}
+        dashboard.onAccess = { [weak self] in self?.configureAccess() }
         dashboard.onRefresh = { [weak self] in self?.manualRefresh() }
         dashboard.refreshEnabled = !activity.suspended && !policy.busy && !kimi.busy && !grok.busy
         if !dashboard.refreshMessage.isEmpty {
             dashboard.refreshMessage = (policy.busy || kimi.busy || grok.busy || zaiBusy) ? "Atualizando dados…" : ([zaiRefreshMessage,kimi.message,grok.message].compactMap{$0}.joined(separator:" · "))
         }
         dashboard.update()
+    }
+    @objc func configureAccess() {
+        func status(_ snapshot:QuotaSnapshot?)->String {StatusPresentation.validRemaining(snapshot)==nil ? "Sem métrica disponível" : "Métrica disponível em cache"}
+        accessSetup.providers=[
+            ProviderAccess(key:"codex",name:"Codex",status:status(snapshot),detail:"Login ChatGPT pelo Codex CLI oficial.",actionTitle:"Como conectar"),
+            ProviderAccess(key:"claude",name:"Claude Code",status:status(claudeSnapshot),detail:"Cache de quota alimentado pela statusline do Claude Code.",actionTitle:"Configurar"),
+            ProviderAccess(key:"zai",name:"Z.ai",status:status(zaiSnapshot),detail:"Chave no Keychain deste Mac.",actionTitle:"Cadastrar chave",enabled:!zaiBusy),
+            ProviderAccess(key:"kimi",name:"Kimi Code",status:status(kimi.snapshot),detail:"Chave do Coding Plan no Keychain. OAuth preservado.",actionTitle:"Cadastrar chave",enabled:!kimi.busy),
+            ProviderAccess(key:"grok",name:"Grok Unified",status:status(grok.snapshot),detail:"Login da assinatura pelo Grok Build oficial.",actionTitle:"Como conectar")
+        ]
+        accessSetup.onConfigure = { [weak self] key in
+            switch key {
+            case "kimi":self?.kimi.configure()
+            case "zai":self?.configureZai()
+            default:AccessSetup.guide(key)
+            }
+        }
+        dashboard.close();accessSetup.show()
     }
     @objc func statusClicked() {
         let event = NSApp.currentEvent
@@ -172,6 +192,8 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func buildMenu() {
         menu.removeAllItems()
+        let access=NSMenuItem(title:"Configurar acessos…",action:#selector(configureAccess),keyEquivalent:"")
+        access.target=self;menu.addItem(access);menu.addItem(NSMenuItem.separator())
         let zaiUpdate = NSMenuItem(title: "Z.ai: consultar agora", action: #selector(refreshZaiNow), keyEquivalent: "")
         zaiUpdate.target = self; zaiUpdate.isEnabled = !activity.suspended && !zaiRequestIsManual
         menu.addItem(zaiUpdate)
@@ -381,15 +403,16 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard !Runtime.isTest, !zaiBusy else { return }
         let alert = NSAlert(); alert.messageText = "Chave Z.ai"
         alert.informativeText = "A chave será salva no Keychain deste Mac e usada somente para consultar quotas. Não coloque a chave no chat ou em arquivos de configuração."
-        let field = NSSecureTextField(frame:NSRect(x:0,y:0,width:340,height:24))
+        let field = KimiCredentialField(frame:NSRect(x:0,y:0,width:340,height:24))
+        alert.window.initialFirstResponder=field
         alert.accessoryView = field; alert.addButton(withTitle:"Salvar"); alert.addButton(withTitle:"Cancelar")
         NSApp.activate(ignoringOtherApps:true)
         guard alert.runModal() == .alertFirstButtonReturn else { field.stringValue = ""; return }
         defer { field.stringValue = "" }
         do {
-            try KeychainStore.save(field.stringValue)
+            try KeychainStore.save(field.stringValue.trimmingCharacters(in:.whitespacesAndNewlines))
             clearZaiCache(); zaiManualCooldown = .distantPast; refreshZaiNow()
-        } catch { zaiError = (error as? QuotaError)?.text ?? "Falha ao salvar no Keychain"; updateUI() }
+        } catch { zaiError = (error as? QuotaError)?.text ?? "Falha ao salvar no Keychain"; updateUI();let errorAlert=NSAlert();errorAlert.messageText="Z.ai";errorAlert.informativeText=zaiError!;errorAlert.runModal() }
     }
     @objc func removeZai() {
         guard !Runtime.isTest, !zaiBusy else { return }
@@ -487,7 +510,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if CommandLine.arguments.contains("--loop-self-test") { runLoopTests(); return }
         if CommandLine.arguments.contains("--ui-self-test") {
             guard let i = CommandLine.arguments.firstIndex(of: "--codex"), i+1 < CommandLine.arguments.count else { exit(2) }
-            runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); runQuotaDashboardTests(); return
+            runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); runQuotaDashboardTests();runAccessTests(); return
         }
         if CommandLine.arguments.contains("--demo-confetti") || CommandLine.arguments.contains("--demo-confetti-motion") {
             // One request to the running app: no second persistent demo app/process or model call.

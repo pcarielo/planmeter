@@ -15,11 +15,16 @@ struct StatusPresentation {
         return result
     }()
 
+    static func validRemaining(_ snapshot:QuotaSnapshot?) -> Double? {
+        snapshot?.windows.compactMap(\.remaining).filter{$0.isFinite && (0...100).contains($0)}.min()
+    }
     static func zaiText(_ snapshot: QuotaSnapshot?) -> String {
-        func remaining(_ minutes: Int) -> Double? {
-            snapshot?.windows.filter { $0.durationMinutes == minutes }.compactMap(\.remaining).min()
+        let periods:[(Int,String)]=[(300,"5h"),(10080,"sem")]
+        let values=periods.compactMap { minutes,label -> String? in
+            let remaining=snapshot?.windows.filter{$0.durationMinutes==minutes}.compactMap(\.remaining).filter{$0.isFinite && (0...100).contains($0)}.min()
+            return remaining.map{label+" "+percentLabel($0)}
         }
-        return "5h \(percentLabel(remaining(300))) · sem \(percentLabel(remaining(10080)))"
+        return values.isEmpty ? percentLabel(validRemaining(snapshot)) : values.joined(separator:" · ")
     }
 
     static func make(codex: QuotaSnapshot?, claude: QuotaSnapshot?, zai: QuotaSnapshot?,
@@ -28,13 +33,15 @@ struct StatusPresentation {
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
         let title = NSMutableAttributedString(string: "")
         var labels: [String] = []
-        var providers: [(String, String, String, Bool)] = [
-            ("codex", "Codex", percentLabel(codex?.remaining), codexStale && codex != nil),
-            ("claude", "Claude", percentLabel(claude?.remaining), claudeStale && claude != nil),
-            ("zai", "Z.ai", zaiText(zai), zaiStale && zai != nil)
-        ]
-        if showKimi { providers.append(("kimi", "Kimi Code", zaiText(kimi), kimiStale && kimi != nil)) }
-        if let grok=grok {providers.append(("grok","Grok",percentLabel(grok.remaining),grokStale))}
+        var providers: [(String, String, String, Bool)] = []
+        if let value=validRemaining(codex) {providers.append(("codex","Codex",percentLabel(value),codexStale))}
+        if let value=validRemaining(claude) {providers.append(("claude","Claude",percentLabel(value),claudeStale))}
+        if validRemaining(zai) != nil {providers.append(("zai","Z.ai",zaiText(zai),zaiStale))}
+        if showKimi && validRemaining(kimi) != nil {providers.append(("kimi","Kimi Code",zaiText(kimi),kimiStale))}
+        if let value=validRemaining(grok) {providers.append(("grok","Grok",percentLabel(value),grokStale))}
+        if providers.isEmpty {
+            return StatusPresentation(title:NSAttributedString(string:"PlanMeter"+badge,attributes:attributes),accessibilityText:"PlanMeter · configurar acessos"+badge)
+        }
         for (index, provider) in providers.enumerated() {
             let (key, name, value, stale) = provider
             if index > 0 { title.append(NSAttributedString(string: "  ", attributes: attributes)) }
