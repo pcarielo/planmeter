@@ -33,3 +33,7 @@ O cache Claude Code só se renova com atividade do Claude Code. Dados locais nã
 O projeto ainda não oferece assinatura Developer ID ou notarização. Builds locais usam assinatura ad hoc. Não desative o Gatekeeper ou remova atributos de quarentena para contornar alertas. Registre a origem do build e a mensagem exibida para investigar o problema.
 
 Para comunicação de vulnerabilidades, consulte [SECURITY.md](../SECURITY.md).
+
+## Kimi Code
+
+A chave do Kimi Code fica no Keychain em item separado do Z.ai. O cliente faz somente GET de quota no host fixo api.kimi.com, não segue redirecionamentos e limita a resposta. Não lê tokens OAuth ou arquivos de autenticação do Kimi CLI. Testes usam credenciais fictícias e transportes injetados, sem rede ou Keychain reais.

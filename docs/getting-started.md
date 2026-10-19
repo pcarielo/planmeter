@@ -63,6 +63,12 @@ Não passe a chave em comandos, argumentos, variáveis de ambiente ou arquivos d
 
 As consultas automáticas ocorrem a cada 15 minutos. Consultas manuais respeitam um intervalo mínimo de 60 segundos. Respostas HTTP 429 também limitam novas tentativas.
 
+## Kimi Code
+
+Escolha **Kimi: configurar chave…** no menu e cadastre a chave do Kimi Code/Coding Plan no prompt seguro. Ela fica no Keychain deste Mac. Chaves da plataforma Moonshot API são diferentes. O aplicativo não importa nem modifica o OAuth de outros programas.
+
+A barra mostra separadamente o saldo de 5h e o semanal quando o provedor informa essas janelas. A coleta automática ocorre a cada 15 minutos; a manual respeita 60 segundos e eventuais restrições HTTP 429. Sem chave ou resposta válida, o aplicativo indica indisponibilidade.
+
 ## Iniciar com a sessão
 
 O início automático é opcional:

@@ -10,5 +10,9 @@
   "zai.svg": {
     "url": "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
     "sha256": "07a45e8e35b0b631ed2c68cd1cb041f9721b1ceeb0bd0e34f1459b0304a741c7"
+  },
+  "kimi.ico": {
+    "url": "https://www.kimi.com/favicon.ico",
+    "sha256": "df91c1ecf1d4894cf05845cdce44549ed3ccca3478b97a70972d1bc82ac4f2d1"
   }
 }

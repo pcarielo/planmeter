@@ -9,7 +9,7 @@
 - Codex usa somente `account/read` e `account/rateLimits/read` pelo CLI oficial autenticado, via stdio. `codexPath`, quando configurado, é um caminho absoluto não secreto em `config.json`.
 - Claude Code usa cache da statusline. Inspecione com `python3 scripts/configure-claude.py --check`; aplique somente quando autorizado, usando `--apply`, que faz backup e preserva a statusline existente por wrapper.
 - Não inicie atividade de modelo para renovar o cache Claude. Cache antigo ou ausente não significa quota zero.
-- A chave Z.ai é cadastrada pelo usuário no prompt seguro do aplicativo e armazenada no Keychain. Nunca a peça em chat ou a passe em argumentos, ambiente, logs ou configuração. Não leia credenciais de outros aplicativos.
+- As chaves Z.ai e Kimi Code são cadastradas pelo usuário no prompt seguro do aplicativo e armazenadas no Keychain. Nunca as peça em chat ou as passe em argumentos, ambiente, logs ou configuração. Não leia credenciais de outros aplicativos.
 - Não amplie chamadas externas, SSH, autenticação ou infraestrutura para testes. Use dados sintéticos.
 - Compilar não instala. Antes de substituir o aplicativo, confira testes, assinatura, destino e identidade do processo. Reinicie somente o monitor autorizado.
 - Não habilite início automático por padrão. `--login` e `login-item.sh enable` dependem de escolha explícita do usuário.

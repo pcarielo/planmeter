@@ -3,6 +3,7 @@ import Foundation
 
 final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var status: NSStatusItem!
+    let kimi = KimiMonitor()
     var menu = NSMenu()
     var snapshot: QuotaSnapshot?
     var zaiReading: ZaiReading?, zaiSnapshot: QuotaSnapshot?
@@ -45,6 +46,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var zaiFile: URL { cacheDirectory.appendingPathComponent("zai-quota.json") }
     var claudeResetFile: URL { cacheDirectory.appendingPathComponent("claude-reset-state.json") }
     var preferencesFile: URL { cacheDirectory.appendingPathComponent("preferences.json") }
+    static let kimiConfigureRequest = Notification.Name("io.github.pcarielo.planmeter.configure-kimi")
     static let zaiRefreshRequest = Notification.Name("io.github.pcarielo.planmeter.refresh-zai")
     static let demoRequest = Notification.Name("io.github.pcarielo.planmeter.explicit-demo")
 
@@ -75,6 +77,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         distributedObservers.append(dc.addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in self?.setScreenLocked(false) })
         distributedObservers.append(dc.addObserver(forName: Self.demoRequest, object: "io.github.pcarielo.planmeter", queue: .main) { [weak self] n in self?.startDemo(motion: n.userInfo?["motion"] as? Bool ?? false) })
         distributedObservers.append(dc.addObserver(forName: Self.zaiRefreshRequest, object: "io.github.pcarielo.planmeter", queue: .main) { [weak self] _ in self?.refreshZaiNow() })
+        distributedObservers.append(dc.addObserver(forName:Self.kimiConfigureRequest,object:"io.github.pcarielo.planmeter",queue:.main) { [weak self] _ in self?.kimi.configure() })
         if let session = CGSessionCopyCurrentDictionary() as? [String: Any] { activity.screenLocked = session["CGSSessionScreenIsLocked"] as? Bool ?? false; policy.sleeping = activity.suspended }
         if let reading = zaiReading { zaiManualCooldown = reading.nextAttemptAt.map { Date(timeIntervalSince1970:$0) } ?? .distantPast }
         if let data = try? Data(contentsOf:zaiCooldownFile), let schedule = try? JSONDecoder().decode(ZaiSchedule.self,from:data) {
@@ -82,10 +85,13 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if schedule.manual.isFinite, schedule.manual > now, schedule.manual <= now + 86400 { zaiManualCooldown = max(zaiManualCooldown,Date(timeIntervalSince1970:schedule.manual)) }
             if schedule.automatic.isFinite, schedule.automatic > now, schedule.automatic <= now + 86400 { zaiAutomaticAfter = Date(timeIntervalSince1970:schedule.automatic) }
         }
+        kimi.cacheDirectory = cacheDirectory
+        kimi.onChange = { [weak self] in self?.updateUI(); self?.writeMetrics() }
+        kimi.load(); kimi.setPaused(activity.suspended)
         startClaudeTimer(); startZaiTimer(); updateUI(); writeMetrics(); refresh()
     }
     func stale(_ value: QuotaSnapshot?, error: String? = nil, now: Date = Date()) -> Bool {
-        error != nil || value == nil || now.timeIntervalSince(value!.queriedAt) > (value!.effectiveProvider == "zai" ? 960 : 120)
+        error != nil || value == nil || now.timeIntervalSince(value!.queriedAt) > (["zai", "kimi"].contains(value!.effectiveProvider) ? 960 : 120)
     }
     var realPending: [ResetRecord] {
         detector.state.activePending(snapshot: snapshot) + claudeDetector.state.activePending(snapshot: claudeSnapshot)
@@ -94,7 +100,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let badge = demoPending || !realPending.isEmpty ? " 🎉" : ""
         let presentation = StatusPresentation.make(codex: snapshot, claude: claudeSnapshot, zai: zaiSnapshot,
             codexStale: stale(snapshot, error: errorText), claudeStale: stale(claudeSnapshot, error: claudeError),
-            zaiStale: stale(zaiSnapshot, error: zaiError), badge: badge)
+            zaiStale: stale(zaiSnapshot, error: zaiError), badge: badge, kimi:kimi.snapshot, kimiStale:kimi.stale, showKimi:true)
         status.button?.attributedTitle = presentation.title
         status.button?.setAccessibilityLabel(presentation.accessibilityText)
         status.button?.toolTip = presentation.accessibilityText + "\nClique único dispensa aviso pendente. Clique direito/Control-clique abre menu."
@@ -160,6 +166,17 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         configure.target = self; configure.isEnabled = !zaiBusy; menu.addItem(configure)
         let remove = NSMenuItem(title:"Z.ai: remover chave…",action:#selector(removeZai),keyEquivalent:"")
         remove.target = self; remove.isEnabled = !zaiBusy; menu.addItem(remove)
+        menu.addItem(NSMenuItem.separator())
+        addProvider("Kimi Code", value:kimi.snapshot, error:kimi.errorText)
+        menu.addItem(info("Kimi: chave do Coding Plan no Keychain; OAuth preservado"))
+        menu.addItem(info("Coleta automática: 15 min; intervalo manual: 60s"))
+        if let message = kimi.message { menu.addItem(info(message)) }
+        let kimiUpdate = NSMenuItem(title:"Kimi: consultar agora",action:#selector(KimiMonitor.refreshNow),keyEquivalent:"")
+        kimiUpdate.target=kimi;kimiUpdate.isEnabled = !activity.suspended && !kimi.busy;menu.addItem(kimiUpdate)
+        let kimiConfigure = NSMenuItem(title:"Kimi: configurar chave…",action:#selector(KimiMonitor.configure),keyEquivalent:"")
+        kimiConfigure.target=kimi;kimiConfigure.isEnabled = !kimi.busy;menu.addItem(kimiConfigure)
+        let kimiRemove = NSMenuItem(title:"Kimi: remover chave…",action:#selector(KimiMonitor.removeKey),keyEquivalent:"")
+        kimiRemove.target=kimi;kimiRemove.isEnabled = !kimi.busy;menu.addItem(kimiRemove)
         let usage = NSMenuItem(title: "Claude: abrir Settings → Usage", action: #selector(openClaudeUsage), keyEquivalent: "")
         usage.target = self; menu.addItem(usage)
         menu.addItem(NSMenuItem.separator())
@@ -252,7 +269,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func savePreferences() { if let data = try? JSONEncoder().encode(preferences) { writePrivate(data, to: preferencesFile) } }
     func writeMetrics() {
         let raw: [String:Any] = ["pid":ProcessInfo.processInfo.processIdentifier,"statusItemVisible":status?.isVisible ?? false,
-            "zaiManualRequests":zaiManualRequests,"zaiAuthStatus":zaiReading?.status ?? "pending","zaiBusy":zaiBusy,
+            "kimiStatus":kimi.reading?.status ?? "pending","kimiBusy":kimi.busy,"kimiRequests":kimi.requests,"zaiManualRequests":zaiManualRequests,"zaiAuthStatus":zaiReading?.status ?? "pending","zaiBusy":zaiBusy,
             "zaiRefreshMessage":zaiRefreshMessage as Any? ?? NSNull(),"zaiReads":zaiReads,
             "failures":policy.failures,"busy":policy.busy,"sleeping":policy.sleeping,
             "realHistoryCount":detector.state.history.count+claudeDetector.state.history.count]
@@ -389,7 +406,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         timer.tolerance = 2; RunLoop.main.add(timer, forMode: .common); claudeTimer = timer
     }
-    @objc func manualRefresh() { refreshClaude(); refresh(); refreshZaiNow() }
+    @objc func manualRefresh() { refreshClaude(); refresh(); refreshZaiNow(); kimi.refreshNow() }
     func refresh() {
         guard policy.begin() else { return }
         timer?.invalidate(); timer = nil; attempts += 1
@@ -416,6 +433,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func syncSuspension() {
         policy.sleeping = activity.suspended
+        kimi.setPaused(activity.suspended)
         if activity.suspended {
             errorText = "Dados em cache; aguardando verificação após pausa"
             claudeError = "Cache aguardando verificação após pausa"
@@ -432,6 +450,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func setDisplaySleeping(_ sleeping: Bool) { activity.displaySleeping = sleeping; syncSuspension() }
     @objc func quitApp() { NSApp.terminate(nil) }
     func applicationWillTerminate(_ notification: Notification) {
+        kimi.stop()
         timer?.invalidate(); claudeTimer?.invalidate(); zaiTimer?.invalidate(); countdownTimer?.invalidate(); confetti.close(); client?.stopForExit(); zaiClient?.cancel()
         for o in observers { NSWorkspace.shared.notificationCenter.removeObserver(o) }
         for o in distributedObservers { DistributedNotificationCenter.default().removeObserver(o) }
@@ -451,17 +470,22 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             fputs("Testes AppKit exigem pacote isolado. Use python3 tests/run-ui-tests.py.\n", stderr)
             exit(2)
         }
-        if CommandLine.arguments.contains("--self-test") { runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runLocalClientTests(); return }
+        if CommandLine.arguments.contains("--self-test") { runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests(); runLocalClientTests(); return }
         if CommandLine.arguments.contains("--confetti-self-test") { runConfettiTests(); return }
         if CommandLine.arguments.contains("--loop-self-test") { runLoopTests(); return }
         if CommandLine.arguments.contains("--ui-self-test") {
             guard let i = CommandLine.arguments.firstIndex(of: "--codex"), i+1 < CommandLine.arguments.count else { exit(2) }
-            runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); return
+            runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); return
         }
         if CommandLine.arguments.contains("--demo-confetti") || CommandLine.arguments.contains("--demo-confetti-motion") {
             // One request to the running app: no second persistent demo app/process or model call.
             guard NSRunningApplication.runningApplications(withBundleIdentifier: "io.github.pcarielo.planmeter").contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) else { print("Abra PlanMeter primeiro, depois use a DEMO no menu."); exit(1) }
             DistributedNotificationCenter.default().postNotificationName(MenuApp.demoRequest, object: "io.github.pcarielo.planmeter", userInfo: ["motion": CommandLine.arguments.contains("--demo-confetti-motion")], deliverImmediately: true)
+            return
+        }
+        if CommandLine.arguments.contains("--configure-kimi") {
+            guard NSRunningApplication.runningApplications(withBundleIdentifier:"io.github.pcarielo.planmeter").contains(where:{$0.processIdentifier != ProcessInfo.processInfo.processIdentifier}) else {exit(1)}
+            DistributedNotificationCenter.default().postNotificationName(MenuApp.kimiConfigureRequest,object:"io.github.pcarielo.planmeter",userInfo:nil,deliverImmediately:true)
             return
         }
         if CommandLine.arguments.contains("--refresh-zai-now") {
