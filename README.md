@@ -1,6 +1,6 @@
 # PlanMeter
 
-Quotas de Codex, Claude Code, Z.ai e Kimi Code na barra de menus do macOS.
+Quotas de Codex, Claude Code, Z.ai, Kimi Code e Grok na barra de menus do macOS.
 
 O PlanMeter é um aplicativo Swift/AppKit que mostra o saldo disponível, as janelas de uso e as previsões de reset fornecidas por cada serviço. Inclui histórico local e confete para celebrar resets. Não inicia conversas com modelos para medir quotas.
 
@@ -14,8 +14,9 @@ O PlanMeter é um aplicativo Swift/AppKit que mostra o saldo disponível, as jan
 | Claude Code | Cache local alimentado pela statusline do Claude Code | Configurar o helper incluído neste repositório |
 | Z.ai | Endpoint HTTPS de quota | Cadastrar sua chave no menu do aplicativo |
 | Kimi Code | Endpoint de uso do Coding Plan | Cadastrar a chave Kimi Code no Keychain pelo menu |
+| Grok Unified | Consulta de quota pelo Grok Build oficial | Instalar o cliente e autenticar a assinatura com `grok login` |
 
-O build padrão obtém os favicons dos sites dos provedores e os guarda somente no build local. Para usar ícones próprios sem esse download, execute `PLANMETER_ICON_MODE=initials ./scripts/install.sh`. Os ícones identificam os provedores na barra de menus. O menu mostra seus nomes e o detalhe das quotas, incluindo as janelas de 5 horas e semanal de Z.ai e Kimi Code. A disponibilidade de cada informação depende do que o provedor retorna.
+O build padrão obtém os favicons dos sites dos provedores e os guarda somente no build local. Para usar ícones próprios sem esse download, execute `PLANMETER_ICON_MODE=initials ./scripts/install.sh`. Os ícones identificam os provedores na barra de menus. O clique principal abre um painel flutuante com cartões dos provedores que têm métricas. Sem fixar, ele fecha após 15 segundos ou ao clicar no conteúdo. Os controles permitem atualizar, fixar ou desafixar e escolher 1×, 1,25× ou 1,5×. Fixado, permanece aberto e pode ser movido pela faixa superior. O clique direito abre as configurações. O painel mostra o detalhe das quotas, incluindo as janelas de 5 horas e semanal de Z.ai e Kimi Code. A disponibilidade de cada informação depende do que o provedor retorna.
 
 O cache do Claude Code se renova quando há atividade no Claude Code. Atualizar o PlanMeter não força uma nova consulta de quota desse provedor.
 

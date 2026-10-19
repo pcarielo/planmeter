@@ -30,7 +30,7 @@ O PlanMeter consulta um endpoint fixo de quota por HTTPS, com método GET. A cha
 
 A chave não deve aparecer em configuração, logs, argumentos de processo ou variáveis de ambiente. O aplicativo não obtém essa chave de credenciais de outros aplicativos.
 
-O menu apresenta as janelas de 5 horas e semanal quando disponíveis. A consulta automática tem intervalo de 15 minutos. A consulta manual respeita intervalo mínimo de 60 segundos e as restrições de respostas HTTP 429.
+O painel apresenta as janelas de 5 horas e semanal quando disponíveis, com data de reset e tempo restante quando a API informa `nextResetTime`. A consulta automática tem intervalo de 15 minutos. A consulta manual respeita intervalo mínimo de 60 segundos e as restrições de respostas HTTP 429.
 
 ## Kimi Code
 
@@ -57,3 +57,11 @@ O monitor não altera planos, compra créditos ou executa resets. Nenhum provedo
 - [Script de uso publicado pela Z.ai](https://github.com/zai-org/zai-coding-plugins/blob/main/plugins/glm-plan-usage/skills/usage-query-skill/scripts/query-usage.mjs)
 
 Essas interfaces podem mudar. Ausência de dados deve ser investigada sem criar sessões de modelo ou copiar credenciais de outros aplicativos.
+
+## Grok Unified
+
+O PlanMeter usa o Grok Build oficial já autenticado por `grok login`. A consulta envia apenas `initialize` e `_x.ai/billing` pelo protocolo ACP. Não cria sessão de conversa nem envia prompts. O cliente oficial mantém a autenticação; o PlanMeter não lê arquivos de tokens ou cookies.
+
+O percentual vem de `creditUsagePercent`, e o reset de `currentPeriod.end`. Quando `isUnifiedBillingUser` confirma a assinatura unificada, o cartão identifica a quota compartilhada entre produtos elegíveis. O aplicativo não soma quatro quotas nem converte créditos da API em saldo da assinatura. Sem dado válido, não apresenta zero. Consultas automáticas usam 15 minutos; manuais respeitam 60 segundos.
+
+Instale o [Grok Build oficial](https://docs.x.ai/build/overview), conclua `grok login` e abra o PlanMeter. O aplicativo procura o executável em `~/.grok/bin`, `~/.local/bin`, `/opt/homebrew/bin` e `/usr/local/bin`.

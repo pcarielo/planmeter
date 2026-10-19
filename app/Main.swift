@@ -4,6 +4,8 @@ import Foundation
 final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var status: NSStatusItem!
     let kimi = KimiMonitor()
+    let grok = GrokMonitor()
+    let dashboard = QuotaDashboard()
     var menu = NSMenu()
     var snapshot: QuotaSnapshot?
     var zaiReading: ZaiReading?, zaiSnapshot: QuotaSnapshot?
@@ -88,10 +90,13 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         kimi.cacheDirectory = cacheDirectory
         kimi.onChange = { [weak self] in self?.updateUI(); self?.writeMetrics() }
         kimi.load(); kimi.setPaused(activity.suspended)
+        grok.cacheDirectory=cacheDirectory
+        grok.onChange = { [weak self] in self?.updateUI();self?.writeMetrics() }
+        grok.load();grok.setPaused(activity.suspended)
         startClaudeTimer(); startZaiTimer(); updateUI(); writeMetrics(); refresh()
     }
     func stale(_ value: QuotaSnapshot?, error: String? = nil, now: Date = Date()) -> Bool {
-        error != nil || value == nil || now.timeIntervalSince(value!.queriedAt) > (["zai", "kimi"].contains(value!.effectiveProvider) ? 960 : 120)
+        error != nil || value == nil || now.timeIntervalSince(value!.queriedAt) > (["zai", "kimi", "grok"].contains(value!.effectiveProvider) ? 960 : 120)
     }
     var realPending: [ResetRecord] {
         detector.state.activePending(snapshot: snapshot) + claudeDetector.state.activePending(snapshot: claudeSnapshot)
@@ -100,16 +105,39 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let badge = demoPending || !realPending.isEmpty ? " 🎉" : ""
         let presentation = StatusPresentation.make(codex: snapshot, claude: claudeSnapshot, zai: zaiSnapshot,
             codexStale: stale(snapshot, error: errorText), claudeStale: stale(claudeSnapshot, error: claudeError),
-            zaiStale: stale(zaiSnapshot, error: zaiError), badge: badge, kimi:kimi.snapshot, kimiStale:kimi.stale, showKimi:true)
+            zaiStale: stale(zaiSnapshot, error: zaiError), badge: badge, kimi:kimi.snapshot, kimiStale:kimi.stale, showKimi:true,grok:grok.snapshot,grokStale:grok.stale)
         status.button?.attributedTitle = presentation.title
         status.button?.setAccessibilityLabel(presentation.accessibilityText)
-        status.button?.toolTip = presentation.accessibilityText + "\nClique único dispensa aviso pendente. Clique direito/Control-clique abre menu."
-        buildMenu(); reconcileCelebration()
+        status.button?.toolTip = presentation.accessibilityText + "\nClique abre métricas. Clique direito/Control-clique abre configurações."
+        updateDashboard();buildMenu(); reconcileCelebration()
+    }
+    func updateDashboard() {
+        dashboard.cards = [
+                snapshot.map {QuotaCard(key:"codex",name:"Codex",snapshot:$0,stale:stale($0,error:errorText))},
+                claudeSnapshot.map {QuotaCard(key:"claude",name:"Claude",snapshot:$0,stale:stale($0,error:claudeError))},
+                zaiSnapshot.map {QuotaCard(key:"zai",name:"Z.ai",snapshot:$0,stale:stale($0,error:zaiError))},
+                kimi.snapshot.map {QuotaCard(key:"kimi",name:"Kimi Code",snapshot:$0,stale:kimi.stale)},
+                grok.snapshot.map {QuotaCard(key:"grok",name:$0.bucketID=="grok:unified" ? "Grok Unified" : "Grok",snapshot:$0,stale:grok.stale,note:($0.bucketID=="grok:unified" ? "Quota compartilhada · " : "Assinatura · ") + localDate($0.queriedAt))}
+            ].compactMap {$0}
+        dashboard.onRefresh = { [weak self] in self?.manualRefresh() }
+        dashboard.refreshEnabled = !activity.suspended && !policy.busy && !kimi.busy && !grok.busy
+        if !dashboard.refreshMessage.isEmpty {
+            dashboard.refreshMessage = (policy.busy || kimi.busy || grok.busy || zaiBusy) ? "Atualizando dados…" : ([zaiRefreshMessage,kimi.message,grok.message].compactMap{$0}.joined(separator:" · "))
+        }
+        dashboard.update()
     }
     @objc func statusClicked() {
         let event = NSApp.currentEvent
         let right = event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true
-        if !right && (demoPending || !realPending.isEmpty) { acknowledge(); return }
+        if !right {
+            if demoPending || !realPending.isEmpty { acknowledge() }
+            updateDashboard()
+            if let button=status.button,let window=button.window,let screen=window.screen {
+                dashboard.toggle(anchor:window.convertToScreen(button.convert(button.bounds,to:nil)),screen:screen)
+            }
+            return
+        }
+        if !dashboard.pinned {dashboard.close()}
         if let button = status.button { menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height), in: button) }
     }
     func menuWillOpen(_ menu: NSMenu) {
@@ -144,21 +172,6 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func buildMenu() {
         menu.removeAllItems()
-        addProvider("Codex", value: snapshot, error: errorText)
-        menu.addItem(NSMenuItem.separator())
-        addProvider("Claude", value: claudeSnapshot, error: claudeError)
-        menu.addItem(info("Claude: cache local da statusline; atualizado durante o uso do Claude Code"))
-        menu.addItem(NSMenuItem.separator())
-        addProvider("Z.ai", value: zaiSnapshot, error: zaiError)
-        menu.addItem(info("Z.ai: consulta HTTPS local; chave no Keychain"))
-        menu.addItem(info("Coleta automática: 15 min; consulta manual com intervalo de 60s"))
-        if let reading = zaiReading {
-            menu.addItem(info("Última coleta Z.ai: " + localDate(reading.snapshot.queriedAt)))
-            let age = max(0, Int(Date().timeIntervalSince(reading.snapshot.queriedAt)))
-            menu.addItem(info("Idade da coleta Z.ai: \(age)s"))
-        }
-        if let message = zaiRefreshMessage { menu.addItem(info(message)) }
-        menu.addItem(info("Sem janela semanal ou reset presumidos"))
         let zaiUpdate = NSMenuItem(title: "Z.ai: consultar agora", action: #selector(refreshZaiNow), keyEquivalent: "")
         zaiUpdate.target = self; zaiUpdate.isEnabled = !activity.suspended && !zaiRequestIsManual
         menu.addItem(zaiUpdate)
@@ -167,16 +180,14 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let remove = NSMenuItem(title:"Z.ai: remover chave…",action:#selector(removeZai),keyEquivalent:"")
         remove.target = self; remove.isEnabled = !zaiBusy; menu.addItem(remove)
         menu.addItem(NSMenuItem.separator())
-        addProvider("Kimi Code", value:kimi.snapshot, error:kimi.errorText)
-        menu.addItem(info("Kimi: chave do Coding Plan no Keychain; OAuth preservado"))
-        menu.addItem(info("Coleta automática: 15 min; intervalo manual: 60s"))
-        if let message = kimi.message { menu.addItem(info(message)) }
         let kimiUpdate = NSMenuItem(title:"Kimi: consultar agora",action:#selector(KimiMonitor.refreshNow),keyEquivalent:"")
         kimiUpdate.target=kimi;kimiUpdate.isEnabled = !activity.suspended && !kimi.busy;menu.addItem(kimiUpdate)
         let kimiConfigure = NSMenuItem(title:"Kimi: configurar chave…",action:#selector(KimiMonitor.configure),keyEquivalent:"")
         kimiConfigure.target=kimi;kimiConfigure.isEnabled = !kimi.busy;menu.addItem(kimiConfigure)
         let kimiRemove = NSMenuItem(title:"Kimi: remover chave…",action:#selector(KimiMonitor.removeKey),keyEquivalent:"")
         kimiRemove.target=kimi;kimiRemove.isEnabled = !kimi.busy;menu.addItem(kimiRemove)
+        let grokUpdate=NSMenuItem(title:"Grok: consultar agora",action:#selector(GrokMonitor.refreshNow),keyEquivalent:"")
+        grokUpdate.target=grok;grokUpdate.isEnabled = !activity.suspended && !grok.busy;menu.addItem(grokUpdate)
         let usage = NSMenuItem(title: "Claude: abrir Settings → Usage", action: #selector(openClaudeUsage), keyEquivalent: "")
         usage.target = self; menu.addItem(usage)
         menu.addItem(NSMenuItem.separator())
@@ -269,7 +280,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func savePreferences() { if let data = try? JSONEncoder().encode(preferences) { writePrivate(data, to: preferencesFile) } }
     func writeMetrics() {
         let raw: [String:Any] = ["pid":ProcessInfo.processInfo.processIdentifier,"statusItemVisible":status?.isVisible ?? false,
-            "kimiStatus":kimi.reading?.status ?? "pending","kimiBusy":kimi.busy,"kimiRequests":kimi.requests,"zaiManualRequests":zaiManualRequests,"zaiAuthStatus":zaiReading?.status ?? "pending","zaiBusy":zaiBusy,
+            "grokStatus":grok.reading?.status ?? "pending","grokBusy":grok.busy,"grokRequests":grok.requests,"kimiStatus":kimi.reading?.status ?? "pending","kimiBusy":kimi.busy,"kimiRequests":kimi.requests,"zaiManualRequests":zaiManualRequests,"zaiAuthStatus":zaiReading?.status ?? "pending","zaiBusy":zaiBusy,
             "zaiRefreshMessage":zaiRefreshMessage as Any? ?? NSNull(),"zaiReads":zaiReads,
             "failures":policy.failures,"busy":policy.busy,"sleeping":policy.sleeping,
             "realHistoryCount":detector.state.history.count+claudeDetector.state.history.count]
@@ -406,7 +417,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         timer.tolerance = 2; RunLoop.main.add(timer, forMode: .common); claudeTimer = timer
     }
-    @objc func manualRefresh() { refreshClaude(); refresh(); refreshZaiNow(); kimi.refreshNow() }
+    @objc func manualRefresh() { refreshClaude(); refresh(); refreshZaiNow(); kimi.refreshNow(); grok.refreshNow() }
     func refresh() {
         guard policy.begin() else { return }
         timer?.invalidate(); timer = nil; attempts += 1
@@ -433,8 +444,9 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func syncSuspension() {
         policy.sleeping = activity.suspended
-        kimi.setPaused(activity.suspended)
+        kimi.setPaused(activity.suspended);grok.setPaused(activity.suspended)
         if activity.suspended {
+            dashboard.close()
             errorText = "Dados em cache; aguardando verificação após pausa"
             claudeError = "Cache aguardando verificação após pausa"
             detector.interrupt(); claudeDetector.interrupt(); timer?.invalidate(); timer = nil; claudeTimer?.invalidate(); claudeTimer = nil; zaiTimer?.invalidate(); zaiTimer = nil; client?.cancel(); zaiClient?.cancel()
@@ -450,7 +462,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func setDisplaySleeping(_ sleeping: Bool) { activity.displaySleeping = sleeping; syncSuspension() }
     @objc func quitApp() { NSApp.terminate(nil) }
     func applicationWillTerminate(_ notification: Notification) {
-        kimi.stop()
+        dashboard.close();kimi.stop();grok.stop()
         timer?.invalidate(); claudeTimer?.invalidate(); zaiTimer?.invalidate(); countdownTimer?.invalidate(); confetti.close(); client?.stopForExit(); zaiClient?.cancel()
         for o in observers { NSWorkspace.shared.notificationCenter.removeObserver(o) }
         for o in distributedObservers { DistributedNotificationCenter.default().removeObserver(o) }
@@ -470,12 +482,12 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             fputs("Testes AppKit exigem pacote isolado. Use python3 tests/run-ui-tests.py.\n", stderr)
             exit(2)
         }
-        if CommandLine.arguments.contains("--self-test") { runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests(); runLocalClientTests(); return }
+        if CommandLine.arguments.contains("--self-test") { runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests();runGrokTests(); runLocalClientTests(); return }
         if CommandLine.arguments.contains("--confetti-self-test") { runConfettiTests(); return }
         if CommandLine.arguments.contains("--loop-self-test") { runLoopTests(); return }
         if CommandLine.arguments.contains("--ui-self-test") {
             guard let i = CommandLine.arguments.firstIndex(of: "--codex"), i+1 < CommandLine.arguments.count else { exit(2) }
-            runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); return
+            runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); runQuotaDashboardTests(); return
         }
         if CommandLine.arguments.contains("--demo-confetti") || CommandLine.arguments.contains("--demo-confetti-motion") {
             // One request to the running app: no second persistent demo app/process or model call.

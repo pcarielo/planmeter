@@ -43,7 +43,7 @@ final class ZaiClient: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate 
                 guard let rows = payload["limits"] as? [[String:Any]], rows.count <= 32 else { throw QuotaError.message("Quota Z.ai inválida") }
                 envelope["limits"] = rows.map { row -> [String: Any] in
                     var clean: [String:Any] = [:]
-                    for field in ["type","percentage","unit","number"] { if let value = row[field] { clean[field] = value } }
+                    for field in ["type","percentage","unit","number","nextResetTime"] { if let value = row[field] { clean[field] = value } }
                     return clean
                 }
                 envelope["status"] = "ok"

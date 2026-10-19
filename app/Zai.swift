@@ -30,7 +30,7 @@ func parseZai(_ data: Data, now: Date = Date()) throws -> ZaiReading {
             let minutes: Int? = tokenWindow && unit == 3 && count == 5 ? 300 : tokenWindow && unit == 6 && count == 1 ? 10080 : nil
             let base = type == "TIME_LIMIT" ? "Uso MCP" : type == "CREDIT_LIMIT" ? "Uso de créditos" : "Uso de tokens"
             let label = minutes == 300 ? base + " (5h)" : minutes == 10080 ? base + " (semanal)" : base + " (janela não informada)"
-            windows.append(QuotaWindow(name: label, remaining: used.map {100-$0}, durationMinutes: minutes, reset: nil))
+            windows.append(QuotaWindow(name: label, remaining: used.map {100-$0}, durationMinutes: minutes, reset: number(row["nextResetTime"]).flatMap { (946684800000...4102444800000).contains($0) ? $0 / 1000 : nil }))
         }
     }
     var snapshot = QuotaSnapshot(queriedAt: Date(timeIntervalSince1970: time), windows: windows)
@@ -54,6 +54,11 @@ func runZaiTests() {
     func check(_ ok: Bool) { if !ok {fputs("FAIL Z.ai parser\n",stderr);exit(1)};count += 1 }
     let now=Date()
     func payload(_ rows:[[String:Any]], status:String="ok") -> Data { try! JSONSerialization.data(withJSONObject:["source":"zai-official-quota","host":"local-mac","queriedAt":now.timeIntervalSince1970,"status":status,"limits":rows]) }
+    let dated=try! parseZai(payload([["type":"TOKENS_LIMIT","unit":6,"number":1,"percentage":3,"nextResetTime":1793022000000]]),now:now)
+    check(dated.snapshot.windows.first?.reset==1793022000)
+    for invalid:Any in [true,"1793022000000",-1,1793022000,NSNull()] {
+        check((try! parseZai(payload([["type":"TOKENS_LIMIT","percentage":3,"nextResetTime":invalid]]),now:now)).snapshot.windows.first?.reset==nil)
+    }
     let good=try! parseZai(payload([["type":"TOKENS_LIMIT","percentage":25],["type":"TIME_LIMIT","percentage":80]]),now:now)
     check(good.snapshot.windows.count==2);check(good.snapshot.remaining==20);check(good.snapshot.windows[0].remaining==75);check(good.snapshot.windows[1].durationMinutes==nil);check(good.snapshot.windows.allSatisfy{$0.reset==nil});check(good.snapshot.identityFingerprint==nil)
     for value:Any in [-1,101,true,"25",NSNull()] { let reading=try! parseZai(payload([["type":"TOKENS_LIMIT","percentage":value]]));check(reading.snapshot.remaining==nil) }

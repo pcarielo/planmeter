@@ -14,5 +14,9 @@
   "kimi.ico": {
     "url": "https://www.kimi.com/favicon.ico",
     "sha256": "df91c1ecf1d4894cf05845cdce44549ed3ccca3478b97a70972d1bc82ac4f2d1"
+  },
+  "grok.ico": {
+    "url": "https://grok.com/images/favicon.ico",
+    "sha256": "948273de9d49e1f80dbab5a8784e4e6aad97583f2a5d8554e4841dd9073c1f79"
   }
 }

@@ -37,3 +37,7 @@ Para comunicação de vulnerabilidades, consulte [SECURITY.md](../SECURITY.md).
 ## Kimi Code
 
 A chave do Kimi Code fica no Keychain em item separado do Z.ai. O cliente faz somente GET de quota no host fixo api.kimi.com, não segue redirecionamentos e limita a resposta. Não lê tokens OAuth ou arquivos de autenticação do Kimi CLI. Testes usam credenciais fictícias e transportes injetados, sem rede ou Keychain reais.
+
+## Grok
+
+O PlanMeter inicia o cliente oficial Grok Build em um diretório temporário vazio para consultar a assinatura via ACP. Não lê o arquivo de autenticação e não envia prompts. Solicitações de ferramentas recebidas pelo protocolo são recusadas. O cache guarda apenas quota, período, reset e indicação de assinatura unificada; dados financeiros e identificação pessoal da resposta são descartados.
