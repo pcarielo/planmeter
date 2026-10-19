@@ -72,5 +72,14 @@ func runKimiMonitorTests() {
     check(icons==4,"four bundled icons")
     var aged=QuotaSnapshot(queriedAt:Date().addingTimeInterval(-300),windows:restored.snapshot!.windows);aged.provider="kimi"
     check(!MenuApp().stale(aged),"Kimi menu uses 15-minute freshness")
+    let window=NSWindow(contentRect:NSRect(x:0,y:0,width:400,height:100),styleMask:[.titled],backing:.buffered,defer:false)
+    let field=KimiCredentialField(frame:NSRect(x:10,y:10,width:300,height:24))
+    field.pasteText={"synthetic-paste"};window.contentView?.addSubview(field)
+    window.makeFirstResponder(field)
+    let paste=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.command,timestamp:0,windowNumber:window.windowNumber,context:nil,characters:"v",charactersIgnoringModifiers:"v",isARepeat:false,keyCode:9)!
+    check(field.performKeyEquivalent(with:paste),"secure field handles command paste without edit menu")
+    window.makeFirstResponder(nil)
+    check(field.stringValue=="synthetic-paste","secure editor accepts synthetic paste without real clipboard")
+    field.stringValue="";window.orderOut(nil)
     print("PASS Kimi monitor/UI: \(count) checks; no real keychain or network")
 }

@@ -1,5 +1,21 @@
 import AppKit
 
+final class KimiCredentialField: NSSecureTextField {
+    // Keep paste inside the secure editor, including in a menu-only application.
+    var pasteText: () -> String? = { NSPasteboard.general.string(forType:.string) }
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers=event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers == .command, let editor=currentEditor() else {return super.performKeyEquivalent(with:event)}
+        switch event.charactersIgnoringModifiers?.lowercased() {
+        case "v":
+            if let text=pasteText() { (editor as? NSTextView)?.insertText(text,replacementRange:editor.selectedRange) }
+            return true
+        case "a": editor.selectAll(nil);return true
+        default:return super.performKeyEquivalent(with:event)
+        }
+    }
+}
+
 final class KimiMonitor: NSObject {
     var cacheDirectory = FileManager.default.temporaryDirectory
     var onChange: () -> Void = {}
@@ -87,6 +103,7 @@ final class KimiMonitor: NSObject {
                 }
                 self.save(KimiCache(reading:self.reading,lastGood:self.snapshot),to:self.cacheFile)
                 self.save(self.schedule,to:self.scheduleFile);self.onChange()
+                if manual, self.reading?.status != "ok" { self.showFeedback(self.message ?? "Kimi: consulta indisponível") }
             }
         }
     }
@@ -94,12 +111,26 @@ final class KimiMonitor: NSObject {
         guard !KimiEnvironment.isTest,!busy else {return}
         let alert=NSAlert();alert.messageText="Chave do Kimi Code / Coding Plan"
         alert.informativeText="Use a chave emitida no console Kimi Code. Ela ficará no Keychain deste Mac e será usada somente para consultar quotas. O OAuth de outros aplicativos não será alterado."
-        let field=NSSecureTextField(frame:NSRect(x:0,y:0,width:360,height:24));alert.accessoryView=field
-        alert.addButton(withTitle:"Salvar");alert.addButton(withTitle:"Cancelar");NSApp.activate(ignoringOtherApps:true)
+        let field=KimiCredentialField(frame:NSRect(x:0,y:0,width:360,height:24));alert.accessoryView=field
+        alert.addButton(withTitle:"Salvar");alert.addButton(withTitle:"Cancelar")
+        field.placeholderString="Cole a chave aqui (⌘V)"
+        alert.window.initialFirstResponder=field
+        alert.window.makeFirstResponder(field)
+        NSApp.activate(ignoringOtherApps:true)
         defer {field.stringValue=""}
         guard alert.runModal() == .alertFirstButtonReturn else{return}
         do {try KimiKeychain.save(field.stringValue.trimmingCharacters(in:.whitespacesAndNewlines));clear();refreshNow()}
-        catch {message="Kimi: confira se a chave é válida e se o Keychain permite salvá-la";onChange()}
+        catch {
+            message=field.stringValue.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
+                ? "Kimi: o campo está vazio. Nenhuma chave foi salva."
+                : "Kimi: confira se a chave é válida e se o Keychain permite salvá-la"
+            onChange();showFeedback(message!)
+        }
+    }
+    func showFeedback(_ text: String) {
+        guard !KimiEnvironment.isTest else{return}
+        let alert=NSAlert();alert.messageText="Kimi Code";alert.informativeText=text
+        alert.addButton(withTitle:"OK");NSApp.activate(ignoringOtherApps:true);alert.runModal()
     }
     @objc func removeKey() {
         guard !KimiEnvironment.isTest,!busy else{return}

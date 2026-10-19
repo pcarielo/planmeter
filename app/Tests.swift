@@ -88,10 +88,10 @@ func runUITests(binary: String) {
     check(app.detector.state.lastDetectedAt == nil, "first read no celebration")
     check(app.confetti.presentationCount == 0, "no unexpected confetti")
     check(app.status.button?.toolTip?.contains("Codex 63%") == true, "status title")
-    check(app.menu.items.contains(where: { $0.title.contains("2 horas") }), "duration in menu")
-    check(app.menu.items.contains(where: { $0.title.contains("Reset previsto:") }), "reset in menu")
+    check(!app.menu.items.contains(where: { $0.title.contains("2 horas") }), "metrics removed from menu")
+    check(app.dashboard.cards.contains{$0.key=="codex" && !$0.windows.isEmpty}, "quota available in dashboard")
     check(app.menu.items.contains(where: { $0.title.contains("DEMO de confete") }), "explicit demo action")
-    check(app.menu.items.contains(where: { $0.title.contains("aguardando leitura") }), "countdown does not claim reset")
+    check(countdownLabel(reset:Date().addingTimeInterval(-60).timeIntervalSince1970).contains("aguardando leitura"), "countdown does not claim reset")
     check(FileManager.default.fileExists(atPath: app.cacheFile.path), "cache saved")
     let metrics = try? JSONSerialization.jsonObject(with: Data(contentsOf: app.metricsFile)) as? [String: Any]
     check(metrics?["statusItemVisible"] as? Bool == app.status.isVisible, "metrics report actual AppKit visibility")

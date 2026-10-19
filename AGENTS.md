@@ -17,3 +17,5 @@
 - Push, publicação, compras, alterações de plano e mudanças de credenciais exigem autorização explícita.
 - Ao delegar, use XML, YAML ou JSON para delimitar escopo, propriedade dos arquivos, contratos e evidências esperadas.
 - Relate separadamente validação com fixtures, compilação, instalação e observação real dos provedores.
+
+- Grok usa o Grok Build oficial autenticado, via ACP: somente `initialize` e `_x.ai/billing`. Não leia auth.json, cookies ou tokens, não use `session/new`/`session/prompt` e não substitua quota compartilhada por créditos financeiros da API. Testes usam CLI fictício e recusam solicitações de ferramentas do servidor.

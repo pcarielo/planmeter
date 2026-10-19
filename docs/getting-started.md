@@ -69,6 +69,16 @@ Escolha **Kimi: configurar chave…** no menu e cadastre a chave do Kimi Code/Co
 
 A barra mostra separadamente o saldo de 5h e o semanal quando o provedor informa essas janelas. A coleta automática ocorre a cada 15 minutos; a manual respeita 60 segundos e eventuais restrições HTTP 429. Sem chave ou resposta válida, o aplicativo indica indisponibilidade.
 
+## Grok Unified
+
+Instale o [Grok Build oficial](https://docs.x.ai/build/overview) e autentique sua assinatura com `grok login`. O PlanMeter usa o cliente para ler quota e reset, sem copiar tokens nem enviar prompts. Quando a API confirma uso unificado, o cartão mostra a quota compartilhada entre produtos elegíveis.
+
+## Usar o painel
+
+Clique no indicador para abrir os cartões. Provedores sem métricas ficam ocultos; saldo zero continua visível. Use Atualizar para solicitar novas leituras, respeitando os intervalos de cada provedor.
+
+Fixar mantém a janela aberta e permite arrastá-la pela faixa superior. Desafixar reativa o fechamento após 15 segundos. Os botões 1×, 1,25× e 1,5× ajustam o tamanho. O botão × fecha a janela. Clique direito no indicador para configurar chaves, acessar histórico ou sair.
+
 ## Iniciar com a sessão
 
 O início automático é opcional:
