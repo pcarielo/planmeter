@@ -32,6 +32,18 @@ A chave não deve aparecer em configuração, logs, argumentos de processo ou va
 
 O menu apresenta as janelas de 5 horas e semanal quando disponíveis. A consulta automática tem intervalo de 15 minutos. A consulta manual respeita intervalo mínimo de 60 segundos e as restrições de respostas HTTP 429.
 
+## Kimi Code
+
+A fonte é `GET https://api.kimi.com/coding/v1/usages`, usada pelo comando de uso do CLI oficial. O monitor usa uma chave do Kimi Code/Coding Plan, guardada no Keychain no serviço `io.github.pcarielo.planmeter.kimi`, conta `quota`.
+
+O resumo `usage` é tratado como semanal conforme o parser oficial do Kimi CLI. As demais janelas são identificadas pela duração retornada. A barra mostra 5h e semanal separadamente; períodos ausentes ficam indisponíveis. Limite zero ou uso ausente não vira saldo zero. A integração não mede saldo financeiro da plataforma Moonshot API nem infere quota mensal não informada.
+
+A coleta automática respeita 15 minutos; a manual, no mínimo 60 segundos. Respostas 429 ampliam a espera. Os prazos são preservados após reiniciar o aplicativo. Erros preservam a última quota, marcada como desatualizada. Pausa e bloqueio cancelam a solicitação pendente.
+
+Não é necessário iniciar conversa com modelo para consultar a quota. O cadastro ocorre no prompt seguro do menu, nunca por chat, argumento, ambiente ou arquivo de configuração. OAuth existente de outros aplicativos fica intacto; esta versão não importa nem renova seus tokens.
+
+Referência de contrato: [consulta de uso do Kimi CLI](https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/ui/shell/usage.py).
+
 ## Interpretação
 
 Os limites, resets e percentuais dependem da resposta de cada provedor. Um valor antigo, ausente ou indisponível deve ser tratado como falta de informação atual. O histórico local registra observações; ele não é um extrato de cobrança nem uma previsão garantida de disponibilidade.

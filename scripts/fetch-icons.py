@@ -17,10 +17,10 @@ def main():
     mode=os.environ.get('PLANMETER_ICON_MODE','provider')
     if mode not in ('provider','initials'):raise SystemExit('Invalid PLANMETER_ICON_MODE')
     args.output.mkdir(parents=True,exist_ok=True)
-    for name in ('codex','claude','zai'):
+    for name in ('codex','claude','zai','kimi'):
         for ext in ('svg','ico','png'):(args.output/(name+'.'+ext)).unlink(missing_ok=True)
     if mode=='initials':
-        for name,letter in [('codex','C'),('claude','A'),('zai','Z')]:
+        for name,letter in [('codex','C'),('claude','A'),('zai','Z'),('kimi','K')]:
             (args.output/(name+'.svg')).write_text('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" rx="3" fill="#e5e5e5"/><text x="8" y="12" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#151515">'+letter+'</text></svg>')
         return
     manifest=json.loads((ROOT/'scripts/provider-icons.json').read_text())

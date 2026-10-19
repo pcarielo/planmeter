@@ -20,6 +20,8 @@ Não procure segredos em arquivos pessoais, credenciais de outros aplicativos, h
 
 **Z.ai:** oriente o usuário a cadastrar a chave no prompt seguro do menu do aplicativo. Não peça a chave no chat e não a passe por comandos, argumentos, ambiente ou configuração. A chave pertence ao Keychain do usuário. Em segundo plano, Keychain bloqueado significa dados indisponíveis, sem prompt de desbloqueio.
 
+**Kimi Code:** use o cadastro seguro do menu para uma chave do Coding Plan. Não use chaves da plataforma Moonshot API nem leia arquivos OAuth do Kimi CLI. O usuário digita a chave diretamente no aplicativo. Verifique 5h e semanal separadamente depois do cadastro; os testes com fixtures não comprovam autenticação real.
+
 ## Instalar e validar
 
 Quando a instalação local estiver autorizada, execute `./scripts/install.sh`. O destino padrão é `~/Applications/PlanMeter.app`. Confirme o resultado do script, a assinatura e a identidade do aplicativo instalado antes de declarar sucesso. Compilação concluída, por si só, não comprova instalação nem funcionamento dos provedores.

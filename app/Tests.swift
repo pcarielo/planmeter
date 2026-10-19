@@ -275,7 +275,7 @@ func runZaiUITests() {
     check(app.status.button!.title.contains("5h 42% · sem 65%"))
     check(app.status.button!.toolTip!.contains("Z.ai 5h 42% · sem 65%"))
     var icons=0;app.status.button!.attributedTitle.enumerateAttribute(.attachment,in:NSRange(location:0,length:app.status.button!.attributedTitle.length)){ value,_,_ in if value is NSTextAttachment {icons += 1} }
-    check(icons==3)
+    check(icons==4)
     app.zaiEnabled=true;app.zaiBusy=true;app.startZaiTimer();check(app.zaiTimer?.timeInterval==30)
     app.activity.screenLocked=true;app.startZaiTimer();check(app.zaiTimer==nil)
     check(KeychainStore.read()==nil) // Test processes cannot access real Keychain.
