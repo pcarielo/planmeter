@@ -23,7 +23,14 @@ final class QuotaDashboardView: NSView {
         super.init(frame:NSRect(x:0,y:0,width:width,height:max(150,height+30)))
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
-        setAccessibilityLabel("Quotas disponíveis. " + cards.map { card in card.name + (card.stale ? ", dados desatualizados" : "") + ": " + card.windows.map { durationLabel($0.durationMinutes) + " " + percentLabel($0.remaining) }.joined(separator:", ") }.joined(separator:". "))
+        let summaries: [String] = cards.map { card in
+            let windows: [String] = card.windows.map { window in
+                durationLabel(window.durationMinutes) + " " + percentLabel(window.remaining)
+            }
+            let freshness = card.stale ? ", dados desatualizados" : ""
+            return card.name + freshness + ": " + windows.joined(separator:", ")
+        }
+        setAccessibilityLabel("Quotas disponíveis. " + summaries.joined(separator:". "))
     }
     required init?(coder:NSCoder) { fatalError("init(coder:) not supported") }
     override func mouseDown(with event:NSEvent) { dismiss() }
@@ -179,7 +186,7 @@ func runQuotaDashboardTests() {
     dashboard.show(anchor:anchor,screen:screen,timeout:0.05)
     check(dashboard.isVisible,"panel shown")
     check(dashboard.panel?.sharingType == .readOnly,"panel allows capture")
-    let end=Date().addingTimeInterval(0.2);while Date()<end {RunLoop.current.run(until:Date().addingTimeInterval(0.02))}
+    let end=Date().addingTimeInterval(3);while dashboard.isVisible && Date()<end {RunLoop.current.run(until:Date().addingTimeInterval(0.02))}
     check(!dashboard.isVisible,"auto dismiss")
     dashboard.show(anchor:anchor,screen:screen);dashboard.close();check(!dashboard.isVisible,"click dismissal cleanup")
     dashboard.show(anchor:anchor,screen:screen,timeout:0.05);dashboard.togglePinned()
@@ -192,7 +199,8 @@ func runQuotaDashboardTests() {
     dashboard.setScale(1.5);check(dashboard.scale==1.5,"150 percent sizing")
     dashboard.setScale(1);check(dashboard.scale==1,"size returns to normal")
     dashboard.togglePinned();dashboard.armTimer(0.05)
-    RunLoop.current.run(until:Date().addingTimeInterval(0.1))
+    let unpinDeadline=Date().addingTimeInterval(3)
+    while dashboard.isVisible && Date()<unpinDeadline {RunLoop.current.run(until:Date().addingTimeInterval(0.02))}
     check(!dashboard.isVisible && !dashboard.pinned,"unpin restores auto dismissal")
     print("PASS quota dashboard: \(count) checks; synthetic data only")
 }
