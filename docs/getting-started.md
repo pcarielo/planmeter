@@ -23,6 +23,10 @@ O destino padrão é `~/Applications/PlanMeter.app`. Compilar e instalar são a�
 
 O build local tem assinatura ad hoc. Não há assinatura Developer ID ou notarização nesta versão. Se o macOS impedir a abertura, registre a mensagem e a origem do build para diagnóstico. Não desative o Gatekeeper nem remova a quarentena como parte da instalação.
 
+## Acessos
+
+Abra o painel e clique em **Acessos**. A mesma janela fica em **Configurar acessos…** no menu de clique direito. Ela mostra todos os provedores e oferece cadastro seguro de chave ou instruções de conexão. Provedores sem métricas ficam ocultos na barra e no painel de quotas, mas permanecem acessíveis nessa configuração.
+
 ## Codex
 
 Instale o Codex CLI oficial e conclua a autenticação por seu fluxo oficial. O PlanMeter usa a sessão existente por meio do CLI e consulta apenas os métodos de conta e quota.

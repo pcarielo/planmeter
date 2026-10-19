@@ -46,13 +46,13 @@ final class ConfettiPresenter {
         view.layer?.cornerRadius = 14
         let canvas = ConfettiCanvas(frame: view.bounds); canvas.motion = motion
         view.addSubview(canvas)
-        let title = NSTextField(labelWithString: demo ? "DEMO · Confete Codex" : "Codex · Reset detectado")
+        let title = NSTextField(labelWithString: demo ? "DEMO · PlanMeter" : "PlanMeter · Reset detectado")
         title.font = .systemFont(ofSize: 16, weight: .semibold)
         title.frame = NSRect(x: 18, y: 128, width: 315, height: 24); view.addSubview(title)
         let detail = NSTextField(wrappingLabelWithString: message)
         detail.font = .systemFont(ofSize: 12)
         detail.frame = NSRect(x: 18, y: 65, width: 315, height: 55); view.addSubview(detail)
-        let instruction = NSTextField(labelWithString: "Clique uma vez em Codex na barra para dispensar")
+        let instruction = NSTextField(labelWithString: "Clique no indicador do PlanMeter para dispensar")
         instruction.font = .systemFont(ofSize: 11, weight: .medium)
         instruction.frame = NSRect(x: 18, y: 22, width: 325, height: 32); view.addSubview(instruction)
         let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)

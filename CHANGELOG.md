@@ -1,5 +1,12 @@
 # Alterações
 
+## 1.3.0 - 2026-10-19
+
+- Provedores sem métricas ficam ocultos também na barra. Saldo zero continua visível.
+- Botão Acessos com cadastro seguro de chaves e guias de autenticação dos clientes oficiais.
+- README com capturas do painel completo e do aviso de reset, usando dados fictícios.
+- Cadastro Z.ai aceita colagem pelo teclado e mostra falhas no próprio fluxo.
+
 ## 1.2.0 - 2026-10-19
 
 - Painel flutuante com cartões apenas dos provedores que têm métricas, atualização manual, fixação e tamanhos 1×, 1,25× e 1,5×.

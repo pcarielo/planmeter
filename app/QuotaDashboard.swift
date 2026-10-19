@@ -84,7 +84,9 @@ final class QuotaDashboard: NSObject {
     private var timer: Timer?, localMonitor: Any?, globalMonitor: Any?
     private(set) var pinned=false
     private(set) var scale:CGFloat=1
+    private var headerHeight:CGFloat=64
     var onRefresh: () -> Void = {}
+    var onAccess: () -> Void = {}
     var refreshEnabled=true
     var refreshMessage=""
     var cards: [QuotaCard] = []
@@ -108,7 +110,7 @@ final class QuotaDashboard: NSObject {
             if event.window === self.panel {
                 let point=self.panel!.contentView!.convert(event.locationInWindow,from:nil)
                 // Header and all of its buttons stay interactive in transient mode.
-                if point.y >= self.panel!.contentView!.bounds.height-64 {self.armTimer();return event}
+                if point.y >= self.panel!.contentView!.bounds.height-self.headerHeight {self.armTimer();return event}
                 if self.pinned {return event}
                 self.close();return nil
             }
@@ -123,24 +125,26 @@ final class QuotaDashboard: NSObject {
         let view=QuotaDashboardView(cards:QuotaCard.available(cards),width:width/scale)
         view.pinned=pinned
         let logical=view.bounds;view.setFrameSize(NSSize(width:logical.width*scale,height:logical.height*scale));view.bounds=logical
-        let height=min(view.frame.height+64,area.height-24)
+        headerHeight=width<530 ? 94 : 64
+        let height=min(view.frame.height+headerHeight,area.height-24)
         let x=max(area.minX+12,min(top.x,area.maxX-width-12))
         let y=max(area.minY+12,min(top.y-height,area.maxY-height-12))
         panel.setFrame(NSRect(x:x,y:y,width:width,height:height),display:true)
         let content=NSView(frame:NSRect(x:0,y:0,width:width,height:height));content.wantsLayer=true;content.layer?.cornerRadius=16;content.layer?.masksToBounds=true
-        let header=QuotaDashboardHeader(frame:NSRect(x:0,y:height-64,width:width,height:64));header.pinned=pinned
+        let header=QuotaDashboardHeader(frame:NSRect(x:0,y:height-headerHeight,width:width,height:headerHeight));header.pinned=pinned
         func button(_ title:String,_ x:CGFloat,_ width:CGFloat,_ action:Selector)->NSButton {
             let button=NSButton(title:title,target:self,action:action);button.bezelStyle = .rounded
-            button.frame=NSRect(x:x,y:31,width:width,height:26);header.addSubview(button);return button
+            button.frame=NSRect(x:x,y:headerHeight-33,width:width,height:26);header.addSubview(button);return button
         }
         let refresh=button("Atualizar",14,90,#selector(refreshNow));refresh.isEnabled=refreshEnabled
         _=button(pinned ? "Desafixar" : "Fixar",110,90,#selector(togglePinned))
         let sizes=NSSegmentedControl(labels:["1×","1,25×","1,5×"],trackingMode:.selectOne,target:self,action:#selector(changeScale(_:)))
-        sizes.frame=NSRect(x:210,y:31,width:165,height:26);sizes.selectedSegment=scale==1 ? 0 : scale==1.25 ? 1 : 2;header.addSubview(sizes)
+        sizes.frame=NSRect(x:width<530 ? 14 : 210,y:width<530 ? 8 : 31,width:165,height:26);sizes.selectedSegment=scale==1 ? 0 : scale==1.25 ? 1 : 2;header.addSubview(sizes)
+        _=button("Acessos",width<530 ? 210 : 385,90,#selector(openAccess))
         _=button("×",width-46,32,#selector(dismissPanel))
         let message=NSTextField(labelWithString:refreshMessage.isEmpty ? (pinned ? "Fixado · arraste esta faixa para mover" : "Fecha em 15s · clique no conteúdo para fechar") : refreshMessage)
-        message.frame=NSRect(x:16,y:8,width:width-32,height:17);message.font = .systemFont(ofSize:10);message.textColor = .secondaryLabelColor;message.lineBreakMode = .byTruncatingTail;header.addSubview(message)
-        let scroll=NSScrollView(frame:NSRect(x:0,y:0,width:width,height:height-64));scroll.drawsBackground=false;scroll.hasVerticalScroller=view.frame.height>height-64
+        message.frame=NSRect(x:width<530 ? 190 : 16,y:8,width:width-(width<530 ? 206 : 32),height:17);message.font = .systemFont(ofSize:10);message.textColor = .secondaryLabelColor;message.lineBreakMode = .byTruncatingTail;header.addSubview(message)
+        let scroll=NSScrollView(frame:NSRect(x:0,y:0,width:width,height:height-headerHeight));scroll.drawsBackground=false;scroll.hasVerticalScroller=view.frame.height>height-headerHeight
         scroll.documentView=view;view.dismiss = {[weak self] in if self?.pinned == false {self?.close()}}
         content.addSubview(scroll);content.addSubview(header);panel.contentView=content
     }
@@ -158,6 +162,7 @@ final class QuotaDashboard: NSObject {
     @objc func togglePinned() {pinned.toggle();armTimer();update()}
     func setScale(_ value:CGFloat) {guard [CGFloat(1),1.25,1.5].contains(value) else{return};scale=value;update();armTimer()}
     @objc func changeScale(_ sender:NSSegmentedControl) {guard (0...2).contains(sender.selectedSegment) else{return};setScale([1,1.25,1.5][sender.selectedSegment])}
+    @objc func openAccess() {close();onAccess()}
     @objc func dismissPanel() {close()}
     func close() {
         timer?.invalidate();timer=nil
