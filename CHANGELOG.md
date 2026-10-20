@@ -1,5 +1,11 @@
 # Alterações
 
+## 1.3.1 - 2026-10-19
+
+- Leituras automáticas do Keychain não abrem diálogos de autenticação.
+- Autorização explícita pelo painel Acessos e reutilização da chave em memória durante a execução.
+- Opção de usar identidade de assinatura configurada no Mac para manter a confiança entre versões.
+
 ## 1.3.0 - 2026-10-19
 
 - Provedores sem métricas ficam ocultos também na barra. Saldo zero continua visível.

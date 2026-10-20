@@ -81,5 +81,12 @@ func runKimiMonitorTests() {
     window.makeFirstResponder(nil)
     check(field.stringValue=="synthetic-paste","secure editor accepts synthetic paste without real clipboard")
     field.stringValue="";window.orderOut(nil)
+    monitor.clear();monitor.clientFactory={KimiClient(keyProvider:{nil},transport:{_ in fatalError("no credentials must not reach provider")})}
+    monitor.refreshNow();wait();monitor.prepareAfterAuthorization()
+    let authorizedSchedule=try! JSONDecoder().decode(KimiSchedule.self,from:Data(contentsOf:dir.appendingPathComponent("kimi-schedule.json")))
+    check(monitor.schedule.manual<Date() && authorizedSchedule.manual<Date(),"authorization clears credential-only cooldown and persists it")
+    monitor.clientFactory={KimiClient(keyProvider:{"synthetic-only"},transport:{_ in (Data(),429,"900")})}
+    monitor.refreshNow();wait();let limited=monitor.schedule.manual;monitor.prepareAfterAuthorization()
+    check(monitor.schedule.manual==limited && limited>Date(),"authorization preserves provider cooldown")
     print("PASS Kimi monitor/UI: \(count) checks; no real keychain or network")
 }

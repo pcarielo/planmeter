@@ -133,14 +133,14 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         accessSetup.providers=[
             ProviderAccess(key:"codex",name:"Codex",status:status(snapshot),detail:"Login ChatGPT pelo Codex CLI oficial.",actionTitle:"Como conectar"),
             ProviderAccess(key:"claude",name:"Claude Code",status:status(claudeSnapshot),detail:"Cache de quota alimentado pela statusline do Claude Code.",actionTitle:"Configurar"),
-            ProviderAccess(key:"zai",name:"Z.ai",status:status(zaiSnapshot),detail:"Chave no Keychain deste Mac.",actionTitle:"Cadastrar chave",enabled:!zaiBusy),
-            ProviderAccess(key:"kimi",name:"Kimi Code",status:status(kimi.snapshot),detail:"Chave do Coding Plan no Keychain. OAuth preservado.",actionTitle:"Cadastrar chave",enabled:!kimi.busy),
+            ProviderAccess(key:"zai",name:"Z.ai",status:status(zaiSnapshot),detail:"Chave no Keychain deste Mac.",actionTitle:KeychainStore.needsAuthorization ? "Autorizar acesso" : "Cadastrar chave",enabled:!zaiBusy),
+            ProviderAccess(key:"kimi",name:"Kimi Code",status:status(kimi.snapshot),detail:"Chave do Coding Plan no Keychain. OAuth preservado.",actionTitle:KimiKeychain.needsAuthorization ? "Autorizar acesso" : "Cadastrar chave",enabled:!kimi.busy),
             ProviderAccess(key:"grok",name:"Grok Unified",status:status(grok.snapshot),detail:"Login da assinatura pelo Grok Build oficial.",actionTitle:"Como conectar")
         ]
         accessSetup.onConfigure = { [weak self] key in
             switch key {
-            case "kimi":self?.kimi.configure()
-            case "zai":self?.configureZai()
+            case "kimi":if KimiKeychain.needsAuthorization {self?.kimi.authorizeAccess()} else {self?.kimi.configure()}
+            case "zai":if KeychainStore.needsAuthorization {self?.authorizeZai()} else {self?.configureZai()}
             default:AccessSetup.guide(key)
             }
         }
@@ -197,6 +197,8 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let zaiUpdate = NSMenuItem(title: "Z.ai: consultar agora", action: #selector(refreshZaiNow), keyEquivalent: "")
         zaiUpdate.target = self; zaiUpdate.isEnabled = !activity.suspended && !zaiRequestIsManual
         menu.addItem(zaiUpdate)
+        let authorize=NSMenuItem(title:"Z.ai: autorizar acesso ao Keychain…",action:#selector(authorizeZai),keyEquivalent:"")
+        authorize.target=self;authorize.isEnabled = !zaiBusy;menu.addItem(authorize)
         let configure = NSMenuItem(title:"Z.ai: configurar chave…",action:#selector(configureZai),keyEquivalent:"")
         configure.target = self; configure.isEnabled = !zaiBusy; menu.addItem(configure)
         let remove = NSMenuItem(title:"Z.ai: remover chave…",action:#selector(removeZai),keyEquivalent:"")
@@ -204,6 +206,8 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem.separator())
         let kimiUpdate = NSMenuItem(title:"Kimi: consultar agora",action:#selector(KimiMonitor.refreshNow),keyEquivalent:"")
         kimiUpdate.target=kimi;kimiUpdate.isEnabled = !activity.suspended && !kimi.busy;menu.addItem(kimiUpdate)
+        let kimiAuthorize=NSMenuItem(title:"Kimi: autorizar acesso ao Keychain…",action:#selector(KimiMonitor.authorizeAccess),keyEquivalent:"")
+        kimiAuthorize.target=kimi;kimiAuthorize.isEnabled = !kimi.busy;menu.addItem(kimiAuthorize)
         let kimiConfigure = NSMenuItem(title:"Kimi: configurar chave…",action:#selector(KimiMonitor.configure),keyEquivalent:"")
         kimiConfigure.target=kimi;kimiConfigure.isEnabled = !kimi.busy;menu.addItem(kimiConfigure)
         let kimiRemove = NSMenuItem(title:"Kimi: remover chave…",action:#selector(KimiMonitor.removeKey),keyEquivalent:"")
@@ -399,6 +403,11 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
     }
+    @objc func authorizeZai() {
+        guard !Runtime.isTest,!zaiBusy else{return}
+        if KeychainStore.authorize() {if zaiReading?.status=="auth_unavailable" {zaiManualCooldown = .distantPast;zaiAutomaticAfter = .distantPast;saveZaiSchedule()};zaiError=nil;zaiRefreshMessage="Z.ai: acesso autorizado nesta execução";updateUI();refreshZaiNow()}
+        else {let alert=NSAlert();alert.messageText="Z.ai";alert.informativeText="Acesso não autorizado. Use Acessos para tentar novamente.";alert.runModal()}
+    }
     @objc func configureZai() {
         guard !Runtime.isTest, !zaiBusy else { return }
         let alert = NSAlert(); alert.messageText = "Chave Z.ai"
@@ -505,7 +514,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             fputs("Testes AppKit exigem pacote isolado. Use python3 tests/run-ui-tests.py.\n", stderr)
             exit(2)
         }
-        if CommandLine.arguments.contains("--self-test") { runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests();runGrokTests(); runLocalClientTests(); return }
+        if CommandLine.arguments.contains("--self-test") { runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests();runCredentialPolicyTests();runGrokTests(); runLocalClientTests(); return }
         if CommandLine.arguments.contains("--confetti-self-test") { runConfettiTests(); return }
         if CommandLine.arguments.contains("--loop-self-test") { runLoopTests(); return }
         if CommandLine.arguments.contains("--ui-self-test") {

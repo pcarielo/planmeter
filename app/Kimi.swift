@@ -77,7 +77,7 @@ func parseKimi(_ data: Data, now: Date = Date()) throws -> KimiReading {
 func kimiStatus(_ status: String) -> String {
     switch status {
     case "ok": return ""
-    case "auth_unavailable": return "Configure a chave Kimi Code no menu; Keychain ausente ou bloqueado"
+    case "auth_unavailable": return "Kimi: use Acessos para cadastrar a chave ou autorizar o Keychain"
     case "unauthorized": return "Kimi recusou a credencial; confira a chave do Coding Plan"
     case "rate_limited": return "Kimi limitou consultas; aguarde o intervalo informado"
     default: return "Consulta Kimi indisponível; última quota preservada"
