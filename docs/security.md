@@ -41,3 +41,13 @@ A chave do Kimi Code fica no Keychain em item separado do Z.ai. O cliente faz so
 ## Grok
 
 O PlanMeter inicia o cliente oficial Grok Build em um diretório temporário vazio para consultar a assinatura via ACP. Não lê o arquivo de autenticação e não envia prompts. Solicitações de ferramentas recebidas pelo protocolo são recusadas. O cache guarda apenas quota, período, reset e indicação de assinatura unificada; dados financeiros e identificação pessoal da resposta são descartados.
+
+## Autorização do Keychain sem interrupções periódicas
+
+As leituras automáticas não podem abrir diálogos. O aplicativo bloqueia a interação tanto no contexto de autenticação quanto na API do Keychain baseado em arquivos do macOS. As operações são serializadas, incluindo gravação e remoção, para que uma consulta em segundo plano não altere a política de uma ação manual.
+
+Quando o sistema exige autorização, o usuário escolhe **Acessos → Autorizar acesso**. Somente essa ação, o cadastro ou a remoção podem solicitar interação. Uma leitura autorizada pode ser reutilizada em memória durante a execução. A chave persistente continua no Keychain; não é exportada para configuração, cache, ambiente ou logs. Remover ou substituir a chave também atualiza essa cópia em memória.
+
+Builds ad hoc têm identidade vinculada ao conteúdo do executável. Uma atualização pode exigir nova autorização, ainda que o nome do aplicativo seja igual. Para manter a identidade entre versões, o build aceita `PLANMETER_SIGN_IDENTITY` com uma identidade de assinatura válida já configurada no Mac. Isso não cria certificados, não concede confiança a todos os aplicativos e não transforma o build em uma distribuição notarizada. A distribuição padrão continua ad hoc.
+
+Se o Keychain estiver bloqueado ou negar acesso, o monitor preserva a última quota e informa a necessidade de uma ação manual. Ele não pede a senha a cada coleta.

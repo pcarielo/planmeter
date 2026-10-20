@@ -107,6 +107,17 @@ final class KimiMonitor: NSObject {
             }
         }
     }
+    func prepareAfterAuthorization() {
+        // Missing credentials never reached the provider, so no provider cooldown was spent.
+        guard reading?.status=="auth_unavailable" else{return}
+        schedule=KimiSchedule(manual:.distantPast,automatic:.distantPast)
+        save(schedule,to:scheduleFile)
+    }
+    @objc func authorizeAccess() {
+        guard !KimiEnvironment.isTest,!busy else{return}
+        if KimiKeychain.authorize() {prepareAfterAuthorization();message="Kimi: acesso autorizado nesta execução";onChange();refreshNow()}
+        else {message="Kimi: acesso não autorizado. Use Acessos para tentar novamente.";onChange();showFeedback(message!)}
+    }
     @objc func configure() {
         guard !KimiEnvironment.isTest,!busy else {return}
         let alert=NSAlert();alert.messageText="Chave do Kimi Code / Coding Plan"
