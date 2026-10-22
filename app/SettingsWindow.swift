@@ -93,7 +93,7 @@ private struct SettingsRootView: View {
                 Section("Painel") {
                     Toggle("Manter o painel fixado",isOn:$model.interface.pinned)
                     Picker("Fechar quando não estiver fixado",selection:$model.interface.dismissal) {Text("15 segundos").tag(15.0);Text("30 segundos").tag(30.0);Text("60 segundos").tag(60.0)}
-                    Text("Fixado, o painel pode ser arrastado pela faixa superior. As preferências são preservadas ao reiniciar o aplicativo.").font(.caption).foregroundColor(.secondary)
+                    Text("Fixado, o painel pode ser arrastado pela faixa superior. Fechar o painel desativa a fixação. Tema, tamanho e prazo de fechamento são preservados ao reiniciar.").font(.caption).foregroundColor(.secondary)
                 }
             }.formStyle(.grouped).tabItem{Label("Aparência",systemImage:"paintbrush")}.tag("appearance")
             Form {
@@ -122,7 +122,7 @@ final class SettingsWindow {
         model.selected=page
         if window==nil {
             let window=NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:610),styleMask:[.titled,.closable,.miniaturizable],backing:.buffered,defer:false)
-            window.title="Configurações do PlanMeter";window.isReleasedWhenClosed=false
+            window.title="Configurações do PlanMeter";window.level = .floating;window.isReleasedWhenClosed=false
             window.contentViewController=NSHostingController(rootView:SettingsRootView(model:model));window.center();self.window=window
             keyObserver=NotificationCenter.default.addObserver(forName:NSWindow.didBecomeKeyNotification,object:window,queue:.main){[weak self] _ in self?.model.refreshLogin()}
         }

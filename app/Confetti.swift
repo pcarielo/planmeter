@@ -111,5 +111,25 @@ func runResetNoticeTests() {
     guard let notice=app.confetti.panel?.contentView as? ResetNoticeView else {fatalError("clickable notice required")}
     notice.onClick()
     guard app.realPending.isEmpty,app.confetti.panel==nil,app.detector.state.history.first?.acknowledgedAt != nil else {fatalError("click must acknowledge and close")}
+    let observed=Date().addingTimeInterval(-1000),now=Date()
+    var baseline=QuotaSnapshot(queriedAt:observed,windows:[QuotaWindow(name:"five_hour",remaining:30,durationMinutes:300,reset:now.addingTimeInterval(-500).timeIntervalSince1970)])
+    baseline.identityFingerprint="synthetic-claude";baseline.provider="claude";baseline.bucketID="claude_usage"
+    app.claudeDetector.state.baseline=baseline
+    func cache(_ at:Date,_ reset:Date,_ used:Double) {
+        let data:[String:Any]=["source":"claude-code-statusline","providerObservedAt":at.timeIntervalSince1970,"identityFingerprint":"synthetic-claude","rateLimits":["five_hour":["used_percentage":used,"resets_at":reset.timeIntervalSince1970]]]
+        try! JSONSerialization.data(withJSONObject:data).write(to:dir.appendingPathComponent("claude-statusline.json"))
+    }
+    // The provider validates fingerprints as 64 hexadecimal characters.
+    let identity=String(repeating:"a",count:64);app.claudeDetector.state.baseline?.identityFingerprint=identity
+    func validCache(_ at:Date,_ reset:Date,_ used:Double) {
+        cache(at,reset,used)
+        let url=dir.appendingPathComponent("claude-statusline.json")
+        var raw=try! JSONSerialization.jsonObject(with:Data(contentsOf:url)) as! [String:Any];raw["identityFingerprint"]=identity
+        try! JSONSerialization.data(withJSONObject:raw).write(to:url)
+    }
+    validCache(observed,now.addingTimeInterval(-500),70);app.readClaudeCache()
+    guard app.claudeDetector.state.baseline?.windows.count==1 else {fatalError("unchanged expired cache must preserve persisted baseline")}
+    validCache(now,now.addingTimeInterval(18000),1);app.readClaudeCache()
+    guard app.claudeDetector.state.history.count==1 else {fatalError("Claude renewal must survive restart with expired cache")}
     print("PASS reset notice: stale quota persistence, stable refresh, click acknowledgment; synthetic only")
 }

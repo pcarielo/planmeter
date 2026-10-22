@@ -347,7 +347,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let provider = ClaudeCacheProvider(path: cacheDirectory.appendingPathComponent("claude-statusline.json"))
         do {
             let current = try provider.read()
-            if current.queriedAt > (claudeSnapshot?.queriedAt ?? .distantPast) { _ = claudeDetector.accept(current); _ = saveStates() }
+            if current.queriedAt > (claudeDetector.state.baseline?.queriedAt ?? .distantPast) { _ = claudeDetector.accept(current); _ = saveStates() }
             claudeSnapshot = current; claudeError = nil
         } catch { claudeError = "Aguardando dados do uso normal Claude; cache indisponível"; claudeDetector.interrupt() }
     }

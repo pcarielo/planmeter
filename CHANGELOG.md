@@ -3,7 +3,7 @@
 ## 1.4.0 - 2026-10-22
 
 - Configurações nativas com Geral, Contas, Aparência, Avisos e Sobre, acessíveis por `⌘,`.
-- Preferências de tema, tamanho, fixação e fechamento do painel persistidas localmente.
+- Preferências de tema, tamanho e prazo de fechamento do painel persistidas localmente.
 - Início automático por API nativa, somente por escolha do usuário, com proteção contra builds temporários e configuração legada duplicada.
 - Aviso ao detectar outra instalação do monitor.
 - Percentuais inteiros na barra, no painel e no histórico.
