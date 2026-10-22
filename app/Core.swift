@@ -58,7 +58,7 @@ func durationLabel(_ minutes: Int?) -> String {
 }
 func percentLabel(_ value: Double?) -> String {
     guard let value = value else { return "—" }
-    return value.rounded() == value ? String(format: "%.0f%%", value) : String(format: "%.1f%%", value)
+    return String(format: "%.0f%%", value.rounded())
 }
 func localDate(_ date: Date) -> String {
     let f = DateFormatter()

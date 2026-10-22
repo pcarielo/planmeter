@@ -23,9 +23,9 @@ O destino padrão é `~/Applications/PlanMeter.app`. Compilar e instalar são a�
 
 O build local tem assinatura ad hoc. Não há assinatura Developer ID ou notarização nesta versão. Se o macOS impedir a abertura, registre a mensagem e a origem do build para diagnóstico. Não desative o Gatekeeper nem remova a quarentena como parte da instalação.
 
-## Acessos
+## Configurações
 
-Abra o painel e clique em **Acessos**. A mesma janela fica em **Configurar acessos…** no menu de clique direito. Ela mostra todos os provedores e oferece cadastro seguro de chave ou instruções de conexão. Provedores sem métricas ficam ocultos na barra e no painel de quotas, mas permanecem acessíveis nessa configuração.
+Abra o painel e clique em **Configurações**, ou use `⌘,`. A janela reúne Geral, Contas, Aparência, Avisos e Sobre. Ela mostra todos os provedores e oferece cadastro seguro de chave ou instruções de conexão. Provedores sem métricas ficam ocultos na barra e no painel de quotas, mas permanecem acessíveis nessa configuração.
 
 ## Codex
 
@@ -61,7 +61,7 @@ Os valores se renovam com a atividade normal do Claude Code. Um cache ausente ou
 
 ## Z.ai
 
-No menu do PlanMeter, escolha configurar a chave Z.ai e digite sua chave no prompt seguro. Ela é armazenada no Keychain do macOS, no serviço `io.github.pcarielo.planmeter.zai`, conta `quota`.
+Em **Configurações → Contas → Z.ai**, escolha **Cadastrar chave** e digite sua chave no prompt seguro. Ela é armazenada no Keychain do macOS, no serviço `io.github.pcarielo.planmeter.zai`, conta `quota`.
 
 Não passe a chave em comandos, argumentos, variáveis de ambiente ou arquivos de configuração. Para removê-la, use a opção correspondente no menu do aplicativo.
 
@@ -69,7 +69,7 @@ As consultas automáticas ocorrem a cada 15 minutos. Consultas manuais respeitam
 
 ## Kimi Code
 
-Escolha **Kimi: configurar chave…** no menu e cadastre a chave do Kimi Code/Coding Plan no prompt seguro. Ela fica no Keychain deste Mac. Chaves da plataforma Moonshot API são diferentes. O aplicativo não importa nem modifica o OAuth de outros programas.
+Em **Configurações → Contas → Kimi Code**, escolha **Cadastrar chave** e cadastre a chave do Kimi Code/Coding Plan no prompt seguro. Ela fica no Keychain deste Mac. Chaves da plataforma Moonshot API são diferentes. O aplicativo não importa nem modifica o OAuth de outros programas.
 
 A barra mostra separadamente o saldo de 5h e o semanal quando o provedor informa essas janelas. A coleta automática ocorre a cada 15 minutos; a manual respeita 60 segundos e eventuais restrições HTTP 429. Sem chave ou resposta válida, o aplicativo indica indisponibilidade.
 
@@ -81,11 +81,11 @@ Instale o [Grok Build oficial](https://docs.x.ai/build/overview) e autentique su
 
 Clique no indicador para abrir os cartões. Provedores sem métricas ficam ocultos; saldo zero continua visível. Use Atualizar para solicitar novas leituras, respeitando os intervalos de cada provedor.
 
-Fixar mantém a janela aberta e permite arrastá-la pela faixa superior. Desafixar reativa o fechamento após 15 segundos. Os botões 1×, 1,25× e 1,5× ajustam o tamanho. O botão × fecha a janela. Clique direito no indicador para configurar chaves, acessar histórico ou sair.
+Fixar mantém a janela aberta e permite arrastá-la pela faixa superior. Desafixar reativa o prazo configurado em Aparência, de 15 segundos por padrão. Os botões 1×, 1,25× e 1,5× ajustam o tamanho. O botão × fecha a janela e desativa a fixação. Configurações abre uma janela independente. Clique direito no indicador para acessar Configurações, histórico ou sair.
 
 ## Iniciar com a sessão
 
-O início automático é opcional:
+O início automático é opcional e pode ser ativado em **Configurações → Geral** depois da instalação em Aplicativos. A rota abaixo continua disponível para instalações antigas; não combine as duas formas:
 
 ```sh
 ./scripts/login-item.sh enable

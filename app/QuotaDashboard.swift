@@ -87,6 +87,8 @@ final class QuotaDashboard: NSObject {
     private var headerHeight:CGFloat=64
     var onRefresh: () -> Void = {}
     var onAccess: () -> Void = {}
+    var onOptionsChanged:(Double,Bool)->Void={_,_ in}
+    var autoCloseSeconds:TimeInterval=15
     var refreshEnabled=true
     var refreshMessage=""
     var cards: [QuotaCard] = []
@@ -94,8 +96,8 @@ final class QuotaDashboard: NSObject {
     func toggle(anchor:NSRect,screen:NSScreen) {
         if isVisible {close()} else {show(anchor:anchor,screen:screen)}
     }
-    func show(anchor:NSRect,screen:NSScreen,timeout:TimeInterval=15) {
-        close()
+    func show(anchor:NSRect,screen:NSScreen,timeout:TimeInterval?=nil) {
+        tearDown()
         let panel=NSPanel(contentRect:NSRect(x:anchor.maxX-600,y:anchor.minY-300,width:600,height:300),styleMask:[.borderless,.nonactivatingPanel],backing:.buffered,defer:false)
         panel.isReleasedWhenClosed=false;panel.level = .floating;panel.hasShadow=true
         panel.sharingType = .readOnly
@@ -106,7 +108,7 @@ final class QuotaDashboard: NSObject {
         panel.orderFrontRegardless()
         localMonitor=NSEvent.addLocalMonitorForEvents(matching:[.leftMouseDown,.rightMouseDown,.keyDown]) { [weak self] event in
             guard let self=self,self.isVisible else{return event}
-            if event.type == .keyDown {if event.keyCode==53 {self.close();return nil};return event}
+            if event.type == .keyDown {if event.keyCode==53 && (event.window == nil || event.window === self.panel) {self.close();return nil};return event}
             if event.window === self.panel {
                 let point=self.panel!.contentView!.convert(event.locationInWindow,from:nil)
                 // Header and all of its buttons stay interactive in transient mode.
@@ -140,18 +142,18 @@ final class QuotaDashboard: NSObject {
         _=button(pinned ? "Desafixar" : "Fixar",110,90,#selector(togglePinned))
         let sizes=NSSegmentedControl(labels:["1×","1,25×","1,5×"],trackingMode:.selectOne,target:self,action:#selector(changeScale(_:)))
         sizes.frame=NSRect(x:width<530 ? 14 : 210,y:width<530 ? 8 : 31,width:165,height:26);sizes.selectedSegment=scale==1 ? 0 : scale==1.25 ? 1 : 2;header.addSubview(sizes)
-        _=button("Acessos",width<530 ? 210 : 385,90,#selector(openAccess))
+        _=button("Configurações",width<530 ? 210 : 385,130,#selector(openAccess))
         _=button("×",width-46,32,#selector(dismissPanel))
-        let message=NSTextField(labelWithString:refreshMessage.isEmpty ? (pinned ? "Fixado · arraste esta faixa para mover" : "Fecha em 15s · clique no conteúdo para fechar") : refreshMessage)
+        let message=NSTextField(labelWithString:refreshMessage.isEmpty ? (pinned ? "Fixado · arraste esta faixa para mover" : "Fecha em \(Int(autoCloseSeconds))s · clique no conteúdo para fechar") : refreshMessage)
         message.frame=NSRect(x:width<530 ? 190 : 16,y:8,width:width-(width<530 ? 206 : 32),height:17);message.font = .systemFont(ofSize:10);message.textColor = .secondaryLabelColor;message.lineBreakMode = .byTruncatingTail;header.addSubview(message)
         let scroll=NSScrollView(frame:NSRect(x:0,y:0,width:width,height:height-headerHeight));scroll.drawsBackground=false;scroll.hasVerticalScroller=view.frame.height>height-headerHeight
         scroll.documentView=view;view.dismiss = {[weak self] in if self?.pinned == false {self?.close()}}
         content.addSubview(scroll);content.addSubview(header);panel.contentView=content
     }
-    func armTimer(_ seconds:TimeInterval=15) {
+    func armTimer(_ seconds:TimeInterval?=nil) {
         timer?.invalidate();timer=nil
         guard isVisible,!pinned else{return}
-        let next=Timer(timeInterval:seconds,repeats:false){[weak self] _ in self?.close()}
+        let next=Timer(timeInterval:seconds ?? autoCloseSeconds,repeats:false){[weak self] _ in self?.close()}
         RunLoop.main.add(next,forMode:.common);timer=next
     }
     @objc func refreshNow() {
@@ -159,18 +161,24 @@ final class QuotaDashboard: NSObject {
         refreshMessage="Atualização solicitada; limites de cada provedor continuam valendo"
         onRefresh();update();armTimer()
     }
-    @objc func togglePinned() {pinned.toggle();armTimer();update()}
-    func setScale(_ value:CGFloat) {guard [CGFloat(1),1.25,1.5].contains(value) else{return};scale=value;update();armTimer()}
+    @objc func togglePinned() {pinned.toggle();armTimer();update();onOptionsChanged(Double(scale),pinned)}
+    func setScale(_ value:CGFloat) {guard [CGFloat(1),1.25,1.5].contains(value) else{return};scale=value;update();armTimer();onOptionsChanged(Double(scale),pinned)}
     @objc func changeScale(_ sender:NSSegmentedControl) {guard (0...2).contains(sender.selectedSegment) else{return};setScale([1,1.25,1.5][sender.selectedSegment])}
-    @objc func openAccess() {close();onAccess()}
+    @objc func openAccess() {onAccess()}
     @objc func dismissPanel() {close()}
     func close() {
+        let wasPinned=pinned
+        pinned=false
+        tearDown()
+        if wasPinned {onOptionsChanged(Double(scale),false)}
+    }
+    private func tearDown() {
         timer?.invalidate();timer=nil
         if let monitor=localMonitor {NSEvent.removeMonitor(monitor)};localMonitor=nil
         if let monitor=globalMonitor {NSEvent.removeMonitor(monitor)};globalMonitor=nil
         panel?.orderOut(nil);panel=nil
     }
-    deinit {close()}
+    deinit {tearDown()}
 }
 
 func runQuotaDashboardTests() {
@@ -199,6 +207,8 @@ func runQuotaDashboardTests() {
     check(dashboard.isVisible && dashboard.pinned,"pin cancels auto dismissal")
     var refreshes=0;dashboard.onRefresh={refreshes += 1};dashboard.refreshNow()
     check(refreshes==1 && dashboard.isVisible,"refresh action does not dismiss")
+    var settingsOpened=false;dashboard.onAccess={settingsOpened=true};dashboard.openAccess()
+    check(settingsOpened && dashboard.isVisible && dashboard.pinned,"settings independent of pinned dashboard")
     let initialWidth=dashboard.panel!.frame.width
     dashboard.setScale(1.25);check(dashboard.scale==1.25 && dashboard.panel!.frame.width>=initialWidth,"125 percent sizing")
     dashboard.setScale(1.5);check(dashboard.scale==1.5,"150 percent sizing")
@@ -207,5 +217,7 @@ func runQuotaDashboardTests() {
     let unpinDeadline=Date().addingTimeInterval(3)
     while dashboard.isVisible && Date()<unpinDeadline {RunLoop.current.run(until:Date().addingTimeInterval(0.02))}
     check(!dashboard.isVisible && !dashboard.pinned,"unpin restores auto dismissal")
+    dashboard.show(anchor:anchor,screen:screen);dashboard.togglePinned();dashboard.dismissPanel()
+    check(!dashboard.pinned && !dashboard.isVisible,"closing clears pin")
     print("PASS quota dashboard: \(count) checks; synthetic data only")
 }

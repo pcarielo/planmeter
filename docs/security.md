@@ -14,9 +14,9 @@ Esses arquivos podem revelar informações sobre uso e plano. Não os inclua em 
 
 ## Chave Z.ai
 
-O usuário cadastra a chave pelo prompt seguro no menu do aplicativo. O armazenamento usa o Keychain do macOS, serviço `io.github.pcarielo.planmeter.zai`, conta `quota`.
+O usuário cadastra a chave pelo prompt seguro em Configurações → Contas. O armazenamento usa o Keychain do macOS, serviço `io.github.pcarielo.planmeter.zai`, conta `quota`.
 
-A chave não é armazenada em `config.json` nem passada por argumentos, variáveis de ambiente ou logs. O aplicativo não lê credenciais de outros aplicativos para encontrá-la. A remoção é feita pelo menu do PlanMeter.
+A chave não é armazenada em `config.json` nem passada por argumentos, variáveis de ambiente ou logs. O aplicativo não lê credenciais de outros aplicativos para encontrá-la. A remoção é feita em Configurações → Contas.
 
 O acesso depende do Keychain do usuário estar disponível. Quando está bloqueado, a atualização em segundo plano retorna indisponível sem abrir um prompt de desbloqueio. Não há promessa de acesso antes do login. Uma recompilação com assinatura ad hoc pode exigir nova liberação de acesso pelo usuário no Keychain.
 
@@ -46,7 +46,7 @@ O PlanMeter inicia o cliente oficial Grok Build em um diretório temporário vaz
 
 As leituras automáticas não podem abrir diálogos. O aplicativo bloqueia a interação tanto no contexto de autenticação quanto na API do Keychain baseado em arquivos do macOS. As operações são serializadas, incluindo gravação e remoção, para que uma consulta em segundo plano não altere a política de uma ação manual.
 
-Quando o sistema exige autorização, o usuário escolhe **Acessos → Autorizar acesso**. Somente essa ação, o cadastro ou a remoção podem solicitar interação. Uma leitura autorizada pode ser reutilizada em memória durante a execução. A chave persistente continua no Keychain; não é exportada para configuração, cache, ambiente ou logs. Remover ou substituir a chave também atualiza essa cópia em memória.
+Quando o sistema exige autorização, o usuário escolhe **Configurações → Contas → Autorizar acesso**. Somente essa ação, o cadastro ou a remoção podem solicitar interação. Uma leitura autorizada pode ser reutilizada em memória durante a execução. A chave persistente continua no Keychain; não é exportada para configuração, cache, ambiente ou logs. Remover ou substituir a chave também atualiza essa cópia em memória.
 
 Builds ad hoc têm identidade vinculada ao conteúdo do executável. Uma atualização pode exigir nova autorização, ainda que o nome do aplicativo seja igual. Para manter a identidade entre versões, o build aceita `PLANMETER_SIGN_IDENTITY` com uma identidade de assinatura válida já configurada no Mac. Isso não cria certificados, não concede confiança a todos os aplicativos e não transforma o build em uma distribuição notarizada. A distribuição padrão continua ad hoc.
 

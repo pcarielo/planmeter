@@ -22,7 +22,15 @@ final class KimiMonitor: NSObject {
     var clientFactory: () -> KimiClient = { KimiClient() }
     var enabled = !KimiEnvironment.isTest
     private(set) var reading: KimiReading?
-    private(set) var snapshot: QuotaSnapshot?
+    private var lastGood: QuotaSnapshot?
+    private var authenticatedThisRun = false
+    var snapshot: QuotaSnapshot? {
+        guard authenticatedThisRun, let cached=lastGood else {return nil}
+        var value=QuotaSnapshot(queriedAt:cached.queriedAt,windows:cached.windows.filter {$0.reset.map {$0 > Date().timeIntervalSince1970} ?? true})
+        value.provider=cached.provider;value.bucketID=cached.bucketID
+        value.identityFingerprint=cached.identityFingerprint;value.sourceHost=cached.sourceHost
+        return value.windows.isEmpty ? nil : value
+    }
     private(set) var busy = false
     private(set) var requests = 0
     private(set) var message: String?
@@ -46,7 +54,7 @@ final class KimiMonitor: NSObject {
     }
     func load() {
         if let data = try? Data(contentsOf:cacheFile),data.count <= 65536, let cached = try? JSONDecoder().decode(KimiCache.self,from:data) {
-            reading = cached.reading; snapshot = cached.lastGood
+            reading = cached.reading; lastGood = cached.lastGood
         }
         if let data = try? Data(contentsOf:scheduleFile), let cached = try? JSONDecoder().decode(KimiSchedule.self,from:data) {
             let maxDate=Date().addingTimeInterval(86400)
@@ -94,14 +102,14 @@ final class KimiMonitor: NSObject {
                     self.reading=value
                     self.schedule.manual=max(self.schedule.manual,value.nextAttemptAt)
                     self.schedule.automatic=max(self.schedule.automatic,self.schedule.manual)
-                    if value.status=="ok" {self.snapshot=value.snapshot;self.message="Kimi: coleta concluída às " + localDate(value.snapshot.queriedAt)}
-                    else {self.message=kimiStatus(value.status)}
+                    if value.status=="ok" {self.authenticatedThisRun=true;self.lastGood=value.snapshot;self.message="Kimi: coleta concluída às " + localDate(value.snapshot.queriedAt)}
+                    else {if ["auth_unavailable","unauthorized"].contains(value.status) {self.authenticatedThisRun=false};self.message=kimiStatus(value.status)}
                 case .failure:
                     var empty=QuotaSnapshot(queriedAt:now,windows:[]);empty.provider="kimi"
                     self.reading=KimiReading(snapshot:empty,status:"unavailable",nextAttemptAt:self.schedule.manual)
                     self.message="Kimi: consulta falhou; última quota preservada"
                 }
-                self.save(KimiCache(reading:self.reading,lastGood:self.snapshot),to:self.cacheFile)
+                self.save(KimiCache(reading:self.reading,lastGood:self.lastGood),to:self.cacheFile)
                 self.save(self.schedule,to:self.scheduleFile);self.onChange()
                 if manual, self.reading?.status != "ok" { self.showFeedback(self.message ?? "Kimi: consulta indisponível") }
             }
@@ -116,7 +124,7 @@ final class KimiMonitor: NSObject {
     @objc func authorizeAccess() {
         guard !KimiEnvironment.isTest,!busy else{return}
         if KimiKeychain.authorize() {prepareAfterAuthorization();message="Kimi: acesso autorizado nesta execução";onChange();refreshNow()}
-        else {message="Kimi: acesso não autorizado. Use Acessos para tentar novamente.";onChange();showFeedback(message!)}
+        else {authenticatedThisRun=false;message="Kimi: acesso não autorizado. Use Configurações → Contas para tentar novamente.";onChange();showFeedback(message!)}
     }
     @objc func configure() {
         guard !KimiEnvironment.isTest,!busy else {return}
@@ -154,7 +162,7 @@ final class KimiMonitor: NSObject {
     }
     func clear() {
         client?.cancel();client=nil;busy=false
-        generation += 1;reading=nil;snapshot=nil;message=nil;schedule=KimiSchedule(manual:.distantPast,automatic:.distantPast)
+        generation += 1;reading=nil;lastGood=nil;authenticatedThisRun=false;message=nil;schedule=KimiSchedule(manual:.distantPast,automatic:.distantPast)
         try? FileManager.default.removeItem(at:cacheFile);try? FileManager.default.removeItem(at:scheduleFile)
     }
 }

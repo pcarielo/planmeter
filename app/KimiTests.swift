@@ -54,7 +54,7 @@ func runKimiMonitorTests() {
     monitor.setPaused(false);wait();check(monitor.snapshot?.remaining==70,"live state updated")
     monitor.refreshNow();check(calls==1 && monitor.message!.contains("aguarde"),"throttle")
     let restored=KimiMonitor();restored.cacheDirectory=dir;restored.load()
-    check(restored.snapshot?.remaining==70 && restored.schedule.manual>Date(),"cache and interval persist")
+    check(restored.snapshot==nil && restored.schedule.manual>Date(),"cache cannot prove authentication in this process")
     monitor.schedule.manual = .distantPast;monitor.start();check(calls==1,"wake preserves automatic interval")
     monitor.schedule=KimiSchedule(manual:.distantPast,automatic:.distantPast);fail=true;monitor.refreshNow();wait()
     check(monitor.snapshot?.remaining==70 && monitor.stale,"failure preserves marked stale quota")
@@ -66,11 +66,11 @@ func runKimiMonitorTests() {
     check(!monitor.busy && monitor.snapshot==nil,"credential change cancels and discards in-flight result")
     slow=false;monitor.refreshNow();wait()
     check(monitor.snapshot?.remaining==70,"refresh works after credential change")
-    let presentation=StatusPresentation.make(codex:nil,claude:nil,zai:nil,codexStale:false,claudeStale:false,zaiStale:false,badge:"",kimi:restored.snapshot,kimiStale:false,showKimi:true)
+    let presentation=StatusPresentation.make(codex:nil,claude:nil,zai:nil,codexStale:false,claudeStale:false,zaiStale:false,badge:"",kimi:monitor.snapshot,kimiStale:false,showKimi:true)
     check(presentation.accessibilityText.contains("Kimi Code 5h 70% · sem 80%"),"distinct accessible windows")
     var icons=0;presentation.title.enumerateAttribute(.attachment,in:NSRange(location:0,length:presentation.title.length)){value,_,_ in if value is NSTextAttachment {icons += 1}}
     check(icons==1,"only provider with metrics has an icon")
-    var aged=QuotaSnapshot(queriedAt:Date().addingTimeInterval(-300),windows:restored.snapshot!.windows);aged.provider="kimi"
+    var aged=QuotaSnapshot(queriedAt:Date().addingTimeInterval(-300),windows:monitor.snapshot!.windows);aged.provider="kimi"
     check(!MenuApp().stale(aged),"Kimi menu uses 15-minute freshness")
     let window=NSWindow(contentRect:NSRect(x:0,y:0,width:400,height:100),styleMask:[.titled],backing:.buffered,defer:false)
     let field=KimiCredentialField(frame:NSRect(x:10,y:10,width:300,height:24))
@@ -81,8 +81,8 @@ func runKimiMonitorTests() {
     window.makeFirstResponder(nil)
     check(field.stringValue=="synthetic-paste","secure editor accepts synthetic paste without real clipboard")
     field.stringValue="";window.orderOut(nil)
-    monitor.clear();monitor.clientFactory={KimiClient(keyProvider:{nil},transport:{_ in fatalError("no credentials must not reach provider")})}
-    monitor.refreshNow();wait();monitor.prepareAfterAuthorization()
+    monitor.schedule=KimiSchedule(manual:.distantPast,automatic:.distantPast);monitor.clientFactory={KimiClient(keyProvider:{nil},transport:{_ in fatalError("no credentials must not reach provider")})}
+    monitor.refreshNow();wait();check(monitor.snapshot==nil,"lost credential hides old quota");monitor.prepareAfterAuthorization()
     let authorizedSchedule=try! JSONDecoder().decode(KimiSchedule.self,from:Data(contentsOf:dir.appendingPathComponent("kimi-schedule.json")))
     check(monitor.schedule.manual<Date() && authorizedSchedule.manual<Date(),"authorization clears credential-only cooldown and persists it")
     monitor.clientFactory={KimiClient(keyProvider:{"synthetic-only"},transport:{_ in (Data(),429,"900")})}

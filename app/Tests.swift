@@ -55,6 +55,9 @@ func runTests() {
     policy.finish(success: false)
     check(policy.failures == 0, "sleep cancellation doesn't count failure")
     check(percentLabel(nil) == "—", "unknown isn't zero")
+    check(percentLabel(42.4) == "42%", "fraction rounds down for display")
+    check(percentLabel(42.5) == "43%", "fraction rounds up for display")
+    check(percentLabel(0) == "0%" && percentLabel(100) == "100%", "quota endpoints remain integers")
     let environment = Runtime.cliEnvironment(binary:"/opt/homebrew/bin/codex",inherited:["PATH":"/usr/bin:/bin","OPENAI_API_KEY":"synthetic","CODEX_API_KEY":"synthetic"])
     check(environment["PATH"]!.hasPrefix("/opt/homebrew/bin:"),"GUI launch resolves CLI interpreter")
     check(environment["OPENAI_API_KEY"] == nil && environment["CODEX_API_KEY"] == nil,"managed login excludes API key overrides")
@@ -171,6 +174,20 @@ func runResetTests() {
     check(!movementAllowed(reduceMotion: true, demo: true, allowDemoMotion: false), "ordinary demo respects accessibility")
     check(movementAllowed(reduceMotion: true, demo: true, allowDemoMotion: true), "explicit opt-in demo only")
     check(movementAllowed(reduceMotion: false, demo: false, allowDemoMotion: false), "normal animation allowed")
+    var weekly = ResetDetector()
+    _ = weekly.accept(snap(0,used:70,reset:1800,duration:10080));weekly.interrupt()
+    check(weekly.accept(snap(4300,used:1,reset:606600,duration:10080)).count==1,"weekly reset after 40-minute observation delay")
+    var scheduled = ResetDetector(); _ = scheduled.accept(before)
+    scheduled.interrupt()
+    let delayed = snap(2400, used: 2, reset: 5400)
+    check(scheduled.accept(delayed).count == 1, "scheduled renewal survives interruption and delayed reading")
+    check(scheduled.accept(delayed).isEmpty, "delayed renewal deduplicated")
+    var startup = ResetDetector(); startup.state.baseline = before
+    check(startup.accept(delayed).count == 1, "persisted same-account baseline detects elapsed window")
+    rejected(snap(2400, used: 2, reset: 5400, identity: "different"), label: "gap cannot cross account")
+    rejected(snap(8000, used: 2, reset: 11400), label: "gap longer than one window rejected")
+    rejected(snap(2400, used: 50, reset: 5400), label: "elapsed reset without recovered quota rejected")
+    rejected(snap(2400, used: 2, reset: 3000), label: "short reset shift after gap rejected")
     print("PASS reset: \(count) checks")
 }
 
@@ -179,7 +196,7 @@ func runConfettiTests() {
     let presenter = ConfettiPresenter()
     presenter.show(message: "Teste fora da tela; sem consulta ou baseline.", demo: true, display: false, allowDemoMotion: true)
     guard let panel = presenter.panel, !panel.isVisible,
-          panel.ignoresMouseEvents, presenter.activeParticles == 16,
+          !panel.ignoresMouseEvents, presenter.activeParticles == 16,
           presenter.presentationCount == 1 else { exit(1) }
     let deadline = Date().addingTimeInterval(3)
     while presenter.panel != nil && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
@@ -200,6 +217,9 @@ func runHistoryTests() {
     check(detector.state.history.count == 1, "one factual history row")
     check(first.previousUsedPercent == 50 && first.usedPercent == 0 && first.previousServiceResetAt == start.timeIntervalSince1970+1800, "old/new observed values")
     check(detector.state.activePending(snapshot: snap(60,0,3660)).count == 1, "pending until ack")
+    var withoutWindows=QuotaSnapshot(queriedAt:start,windows:[])
+    withoutWindows.identityFingerprint="synthetic-hash";withoutWindows.bucketID="codex"
+    check(detector.state.activePending(snapshot:withoutWindows).count==1,"confirmed reset survives a missing window")
     check(detectionIntervals(detector.state.history).isEmpty, "no statistic with only one event")
     let ack = start.addingTimeInterval(75)
     detector.state.acknowledge(ids: [first.id], at: ack)
@@ -268,8 +288,8 @@ func runZaiUITests() {
     var count=0
     func check(_ ok:Bool) { guard ok else {fputs("FAIL Z.ai UI\n",stderr);exit(1)};count += 1 }
     app.updateUI();check(app.status.button!.title=="PlanMeter")
-    check(app.menu.items.contains{$0.title=="Z.ai: configurar chave…"})
-    check(app.menu.items.contains{$0.title=="Z.ai: remover chave…"})
+    check(app.menu.items.contains{$0.title=="Configurações…"})
+    app.prepareAccessSettings();check(app.accessSetup.providers.first{$0.key=="zai"}?.actions.contains("remove")==true)
     let split=QuotaSnapshot(queriedAt:Date(),windows:[QuotaWindow(name:"5h",remaining:42,durationMinutes:300,reset:nil),QuotaWindow(name:"week",remaining:65,durationMinutes:10080,reset:nil),QuotaWindow(name:"MCP",remaining:0,durationMinutes:nil,reset:nil)])
     app.zaiSnapshot=split;app.zaiError=nil;app.updateUI()
     check(app.status.button!.title.contains("5h 42% · sem 65%"))

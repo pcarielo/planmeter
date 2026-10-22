@@ -18,9 +18,9 @@ Não procure segredos em arquivos pessoais, credenciais de outros aplicativos, h
 
 **Claude Code:** execute `python3 scripts/configure-claude.py --check` antes de alterar a configuração. Quando a configuração da integração estiver autorizada, use `--apply`, que faz backup e preserva a statusline existente com um wrapper. Não substitua `statusLine` manualmente. O cache fica em `~/Library/Application Support/PlanMeter/claude-statusline.json`. Não abra uma sessão de modelo para forçar sua atualização.
 
-**Z.ai:** oriente o usuário a cadastrar a chave no prompt seguro do menu do aplicativo. Não peça a chave no chat e não a passe por comandos, argumentos, ambiente ou configuração. A chave pertence ao Keychain do usuário. Em segundo plano, Keychain bloqueado significa dados indisponíveis, sem prompt de desbloqueio.
+**Z.ai:** oriente o usuário a cadastrar a chave no prompt seguro de Configurações → Contas. Não peça a chave no chat e não a passe por comandos, argumentos, ambiente ou configuração. A chave pertence ao Keychain do usuário. Em segundo plano, Keychain bloqueado significa dados indisponíveis, sem prompt de desbloqueio.
 
-**Kimi Code:** use o cadastro seguro do menu para uma chave do Coding Plan. Não use chaves da plataforma Moonshot API nem leia arquivos OAuth do Kimi CLI. O usuário digita a chave diretamente no aplicativo. Verifique 5h e semanal separadamente depois do cadastro; os testes com fixtures não comprovam autenticação real.
+**Kimi Code:** use o cadastro seguro de Configurações → Contas para uma chave do Coding Plan. Não use chaves da plataforma Moonshot API nem leia arquivos OAuth do Kimi CLI. O usuário digita a chave diretamente no aplicativo. Verifique 5h e semanal separadamente depois do cadastro; os testes com fixtures não comprovam autenticação real.
 
 ## Instalar e validar
 

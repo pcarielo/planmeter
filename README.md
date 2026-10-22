@@ -13,16 +13,16 @@ Clique no indicador para abrir o painel completo. Só aparecem provedores com pe
 ![Painel completo com dados fictícios e ícones de iniciais](docs/images/dashboard.png)
 
 - **Atualizar** solicita novas leituras, respeitando os intervalos de cada provedor.
-- **Fixar** mantém a janela aberta e permite movê-la pela faixa superior. **Desafixar** reativa o fechamento após 15 segundos.
+- **Fixar** mantém a janela aberta e permite movê-la pela faixa superior. **Desafixar** reativa o prazo configurado para fechamento, de 15 segundos por padrão.
 - **1×, 1,25× e 1,5×** ajustam o tamanho.
-- **Acessos** reúne configuração de chaves e instruções de autenticação.
-- **×** fecha o painel. Sem fixar, um clique no conteúdo também o fecha; os controles continuam utilizáveis.
+- **Configurações** abre uma janela independente com contas, aparência, início automático, avisos e informações do aplicativo.
+- **×** fecha o painel e desativa a fixação. Sem fixar, um clique no conteúdo também o fecha; os controles continuam utilizáveis.
 
-Uma falha de consulta preserva a última métrica conhecida, marcada como desatualizada. Isso não significa que uma nova leitura tenha sido concluída.
+Uma falha temporária de consulta pode preservar a última métrica conhecida, marcada como desatualizada. O Kimi só aparece após uma consulta autenticada nesta execução e fica oculto se o acesso à chave falhar. O cache não comprova autenticação.
 
 ## Aviso de reset
 
-Quando o histórico permite confirmar uma renovação de quota, o aplicativo mostra um aviso com confete. O alerta pode ser dispensado pelo indicador da barra. O histórico registra a detecção, não um reset executado pelo aplicativo.
+Quando o histórico permite confirmar uma renovação de quota do Codex ou do Claude com identidade de conta verificável, o aplicativo mostra um aviso com confete. Os demais provedores exibem as datas de reset disponíveis, sem detecção de evento com confete. O alerta permanece até o reconhecimento, por clique nele ou no indicador da barra. Durante bloqueio ou suspensão, ele fica oculto e retorna ao retomar a sessão. O histórico registra a detecção, não um reset executado pelo aplicativo.
 
 ![Aviso de reset com evento simulado, sem alteração de quota real](docs/images/reset.png)
 
@@ -59,13 +59,15 @@ O aplicativo ainda não tem assinatura Developer ID nem notarização. O build l
 
 ## Configuração dos provedores
 
-Abra **Acessos** no painel ou **Configurar acessos…** no menu de clique direito. Todos os provedores aparecem nessa janela de configuração, inclusive os que ainda não têm métricas. Isso permite conectar uma conta sem encher a barra de indicadores vazios.
+![Configurações de aparência, com preferências de demonstração](docs/images/settings.png)
 
-Z.ai e Kimi abrem o cadastro seguro de chave no Keychain. Codex, Claude e Grok oferecem instruções, comando copiável e guia de configuração. O aplicativo não executa logins nem altera configurações de terceiros automaticamente. Se o Keychain exigir permissão, escolha **Autorizar acesso**; coletas automáticas não abrem pedidos de senha. A chave fica persistida no Keychain e pode ser reutilizada em memória durante a execução.
+Abra **Configurações → Contas** no painel ou use `⌘,` com a janela do aplicativo ativa. Todos os provedores aparecem nessa janela de configuração, inclusive os que ainda não têm métricas. Isso permite conectar uma conta sem encher a barra de indicadores vazios.
+
+Z.ai e Kimi abrem o cadastro seguro de chave no Keychain. Codex, Claude e Grok oferecem instruções, comando copiável e guia de configuração. O aplicativo não executa logins nem altera configurações de terceiros automaticamente. Se o Keychain exigir permissão, escolha **Autorizar acesso** na aba Contas; coletas automáticas não abrem pedidos de senha. A chave fica persistida no Keychain e pode ser reutilizada em memória durante a execução.
 
 - **Codex:** use uma instalação oficial do Codex CLI já autenticada. O aplicativo procura o executável no `PATH` e em locais comuns. Um caminho explícito pode ser definido em `codexPath` no arquivo de configuração local.
 - **Claude Code:** execute `python3 scripts/configure-claude.py --check` para inspecionar a configuração. Depois, `python3 scripts/configure-claude.py --apply` configura o helper com backup e preserva a statusline existente por meio de um wrapper.
-- **Z.ai:** abra o menu do aplicativo e escolha a opção de configurar a chave. O prompt seguro grava a chave no Keychain do macOS.
+- **Z.ai:** abra **Configurações → Contas → Z.ai** e escolha **Cadastrar chave**. O prompt seguro grava a chave no Keychain do macOS.
 - **Kimi Code:** use a chave emitida no console do Coding Plan, não a chave da plataforma Moonshot API. O menu oferece cadastro seguro, remoção e consulta. O OAuth de outros aplicativos não é acessado nem alterado.
 - **Grok Unified:** instale o Grok Build oficial e conclua `grok login`. O PlanMeter consulta a assinatura pelo cliente autenticado, sem copiar tokens.
 
@@ -83,7 +85,7 @@ instrucoes:
   - Verifique os requisitos e rode o diagnóstico e os testes com fixtures.
   - Instale em ~/Applications/PlanMeter.app, sem habilitar início automático.
   - Preserve minhas configurações e minha statusline do Claude Code.
-  - Abra Acessos e oriente os logins e o cadastro de chaves pelos fluxos seguros.
+  - Abra Configurações → Contas e oriente os logins e o cadastro de chaves pelos fluxos seguros.
   - Não peça chaves no chat nem crie sessões de modelo para testar quotas.
   - Informe o que foi validado e o que ainda precisa da minha participação.
 ```
