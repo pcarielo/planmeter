@@ -1,5 +1,17 @@
 # Alterações
 
+## 1.4.0 - 2026-10-22
+
+- Configurações nativas com Geral, Contas, Aparência, Avisos e Sobre, acessíveis por `⌘,`.
+- Preferências de tema, tamanho, fixação e fechamento do painel persistidas localmente.
+- Início automático por API nativa, somente por escolha do usuário, com proteção contra builds temporários e configuração legada duplicada.
+- Aviso ao detectar outra instalação do monitor.
+- Percentuais inteiros na barra, no painel e no histórico.
+- Configurações abrem sem fechar o painel; fechar o painel desativa a fixação.
+- Kimi fica oculto até uma consulta autenticada nesta execução e quando o acesso à chave falha.
+- Avisos de reset confirmados permanecem até o reconhecimento e aceitam clique direto.
+- Renovação programada pode ser detectada após suspensão, reinício ou atraso, com comparação da mesma conta e janela.
+
 ## 1.3.1 - 2026-10-19
 
 - Leituras automáticas do Keychain não abrem diálogos de autenticação.
