@@ -1,8 +1,9 @@
 import AppKit
 
-struct ProviderAccess {
+struct ProviderAccess: Equatable {
     let key:String, name:String, status:String, detail:String, actionTitle:String
     var enabled=true
+    var actions:[String]=[]
 }
 final class AccessSetup: NSObject {
     private(set) var panel:NSPanel?
@@ -10,9 +11,13 @@ final class AccessSetup: NSObject {
     var onConfigure:(String)->Void = {_ in}
     func show() {
         panel?.close()
+        let panel=NSPanel(contentRect:NSRect(x:0,y:0,width:620,height:560),styleMask:[.titled,.closable],backing:.buffered,defer:false)
+        panel.title="PlanMeter · Contas";panel.isReleasedWhenClosed=false
+        panel.contentView=makeContentView();panel.center();self.panel=panel
+        NSApp.activate(ignoringOtherApps:true);panel.makeKeyAndOrderFront(nil)
+    }
+    func makeContentView()->NSView {
         let width:CGFloat=620,height:CGFloat=560
-        let panel=NSPanel(contentRect:NSRect(x:0,y:0,width:width,height:height),styleMask:[.titled,.closable],backing:.buffered,defer:false)
-        panel.title="PlanMeter · Acessos";panel.isReleasedWhenClosed=false;panel.level = .floating;panel.sharingType = .readOnly
         let view=NSView(frame:NSRect(x:0,y:0,width:width,height:height))
         func label(_ text:String,_ frame:NSRect,_ size:CGFloat,_ bold:Bool=false)->NSTextField {
             let label=NSTextField(wrappingLabelWithString:text);label.frame=frame;label.font = .systemFont(ofSize:size,weight:bold ? .semibold : .regular);view.addSubview(label);return label
@@ -23,14 +28,30 @@ final class AccessSetup: NSObject {
             let y=height-163-CGFloat(index)*87
             _=label(provider.name,NSRect(x:22,y:y+49,width:180,height:23),14,true)
             let status=label(provider.status,NSRect(x:210,y:y+51,width:width-236,height:20),11);status.textColor = .secondaryLabelColor
-            _=label(provider.detail,NSRect(x:22,y:y+4,width:width-188,height:43),11)
-            let action=NSButton(title:provider.actionTitle,target:self,action:#selector(configure(_:)));action.tag=index;action.isEnabled=provider.enabled;action.bezelStyle = .rounded;action.frame=NSRect(x:width-152,y:y+9,width:128,height:30);view.addSubview(action)
+            _=label(provider.detail,NSRect(x:22,y:y+4,width:width-(provider.actions.isEmpty ? 188 : 230),height:43),11)
+            let action=NSButton(title:provider.actionTitle,target:self,action:#selector(configure(_:)));action.tag=index;action.isEnabled=provider.enabled;action.bezelStyle = .rounded;action.frame=NSRect(x:width-(provider.actions.isEmpty ? 152 : 194),y:y+9,width:128,height:30);view.addSubview(action)
+            if !provider.actions.isEmpty {
+                let more=NSPopUpButton(frame:NSRect(x:width-54,y:y+9,width:32,height:30),pullsDown:true)
+                more.addItem(withTitle:"•••");more.isEnabled=provider.enabled
+                for action in provider.actions {
+                    let label=action=="authorize" ? "Autorizar acesso" : "Remover chave…"
+                    let item=NSMenuItem(title:label,action:#selector(extraAction(_:)),keyEquivalent:"")
+                    item.target=self;item.representedObject=provider.key+":"+action;more.menu?.addItem(item)
+                }
+                more.setAccessibilityLabel("Mais opções de "+provider.name);view.addSubview(more)
+            }
         }
-        panel.contentView=view;panel.center();self.panel=panel;NSApp.activate(ignoringOtherApps:true);panel.makeKeyAndOrderFront(nil)
+        return view
     }
     @objc func configure(_ sender:NSButton) {
         guard providers.indices.contains(sender.tag),providers[sender.tag].enabled else{return}
         panel?.orderOut(nil);onConfigure(providers[sender.tag].key)
+    }
+    @objc func extraAction(_ sender:NSMenuItem) {
+        guard let key=sender.representedObject as? String else{return}
+        let parts=key.split(separator:":",maxSplits:1).map(String.init)
+        guard parts.count==2,let provider=providers.first(where:{$0.key==parts[0]}),provider.enabled,provider.actions.contains(parts[1]) else{return}
+        onConfigure(key)
     }
     static func instruction(for key:String)->(String,String,String) {
         switch key {

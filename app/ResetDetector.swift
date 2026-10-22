@@ -33,8 +33,7 @@ struct ResetState: Codable {
     func activePending(snapshot: QuotaSnapshot?) -> [ResetRecord] {
         guard let snapshot = snapshot, let identity = snapshot.identityFingerprint else { return [] }
         return history.filter { record in
-            record.acknowledgedAt == nil && (record.provider ?? "codex") == snapshot.effectiveProvider && record.identityFingerprint == identity && record.bucketID == snapshot.bucketID &&
-            snapshot.windows.contains(where: { $0.name == record.window && $0.durationMinutes == record.durationMinutes })
+            record.acknowledgedAt == nil && (record.provider ?? "codex") == snapshot.effectiveProvider && record.identityFingerprint == identity && record.bucketID == snapshot.bucketID
         }
     }
     mutating func acknowledge(ids: Set<String>, at: Date = Date()) {
@@ -48,13 +47,12 @@ struct ResetDetector {
     mutating func accept(_ current: QuotaSnapshot) -> [ResetRecord] {
         let previous = state.baseline
         defer { state.baseline = current; armed = true }
-        guard armed, let prior = previous,
+        guard let prior = previous,
               let identity = current.identityFingerprint, !identity.isEmpty,
               identity == prior.identityFingerprint,
               current.effectiveProvider == prior.effectiveProvider,
               current.bucketID == (current.effectiveProvider == "claude" ? "claude_usage" : "codex"), current.bucketID == prior.bucketID,
-              current.queriedAt > prior.queriedAt,
-              current.queriedAt.timeIntervalSince(prior.queriedAt) <= 150 else { return [] }
+              current.queriedAt > prior.queriedAt else { return [] }
         var events: [ResetRecord] = []
         for window in current.windows {
             guard let old = prior.windows.first(where: { $0.name == window.name }),
@@ -69,7 +67,14 @@ struct ResetDetector {
                   oldReset >= prior.queriedAt.timeIntervalSince1970 - 180,
                   newReset > current.queriedAt.timeIntervalSince1970 else { continue }
             let seconds = Double(duration) * 60, now = current.queriedAt.timeIntervalSince1970
-            guard abs((newReset - now) - seconds) <= 180, oldReset - now <= seconds + 180 else { continue }
+            let gap = current.queriedAt.timeIntervalSince(prior.queriedAt)
+            // Early/manual resets still need uninterrupted, closely spaced observations.
+            let continuous = armed && gap <= 150 && abs((newReset - now) - seconds) <= 180
+            // A scheduled renewal can be confirmed after sleep/restart from the same
+            // account: the old deadline passed, quota recovered, and a full window advanced.
+            let scheduled = gap <= seconds && oldReset <= now &&
+                newReset - oldReset >= seconds - 180 && newReset - now <= seconds + 180
+            guard (continuous || scheduled), oldReset - now <= seconds + 180 else { continue }
             let id = "\(current.effectiveProvider):\(identity):\(current.bucketID!):\(window.name):\(duration):\(Int64(newReset))"
             guard !state.recentEventIDs.contains(id), !state.history.contains(where: { $0.id == id }) else { continue }
             let event = ResetRecord(id: id, provider: current.effectiveProvider, identityFingerprint: identity, bucketID: current.bucketID!, window: window.name,

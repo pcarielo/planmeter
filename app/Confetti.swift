@@ -19,7 +19,13 @@ final class ConfettiCanvas: NSView {
         }
     }
 }
+final class ResetNoticeView: NSView {
+    var onClick: () -> Void = {}
+    override func hitTest(_ point: NSPoint) -> NSView? {bounds.contains(point) ? self : nil}
+    override func mouseDown(with event: NSEvent) {onClick()}
+}
 final class ConfettiPresenter {
+    var onAcknowledge: () -> Void = {}
     private(set) var panel: NSPanel?
     private(set) var canvas: ConfettiCanvas?
     private var animationTimer: Timer?
@@ -41,7 +47,8 @@ final class ConfettiPresenter {
         let size = NSSize(width: 350, height: 175)
         let frame = NSRect(x: screen.visibleFrame.maxX - size.width - 16,
                            y: screen.visibleFrame.maxY - size.height - 12, width: size.width, height: size.height)
-        let view = NSView(frame: NSRect(origin: .zero, size: size)); view.wantsLayer = true
+        let view = ResetNoticeView(frame: NSRect(origin: .zero, size: size)); view.wantsLayer = true
+        view.onClick = { [weak self] in self?.onAcknowledge() }
         view.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.96).cgColor
         view.layer?.cornerRadius = 14
         let canvas = ConfettiCanvas(frame: view.bounds); canvas.motion = motion
@@ -52,14 +59,14 @@ final class ConfettiPresenter {
         let detail = NSTextField(wrappingLabelWithString: message)
         detail.font = .systemFont(ofSize: 12)
         detail.frame = NSRect(x: 18, y: 65, width: 315, height: 55); view.addSubview(detail)
-        let instruction = NSTextField(labelWithString: "Clique no indicador do PlanMeter para dispensar")
+        let instruction = NSTextField(labelWithString: "Clique neste aviso ou no indicador para dispensar")
         instruction.font = .systemFont(ofSize: 11, weight: .medium)
         instruction.frame = NSRect(x: 18, y: 22, width: 325, height: 32); view.addSubview(instruction)
         let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.contentView = view; panel.isOpaque = false; panel.backgroundColor = .clear
         panel.hasShadow = true; panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-        panel.ignoresMouseEvents = true; panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false
+        panel.ignoresMouseEvents = false; panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false
         self.panel = panel; self.canvas = canvas; presentationCount += 1
         if display { panel.orderFrontRegardless() }
         if motion {
@@ -85,4 +92,24 @@ final class ConfettiPresenter {
 }
 func movementAllowed(reduceMotion: Bool, demo: Bool, allowDemoMotion: Bool) -> Bool {
     !reduceMotion || (demo && allowDemoMotion)
+}
+
+func runResetNoticeTests() {
+    let app=MenuApp();app.celebrationDisplay=false
+    let dir=FileManager.default.temporaryDirectory.appendingPathComponent("reset-notice-"+UUID().uuidString)
+    app.cacheDirectory=dir;app.status=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength);app.menu=NSMenu()
+    defer {app.confetti.close();NSStatusBar.system.removeStatusItem(app.status);try? FileManager.default.removeItem(at:dir)}
+    var snapshot=QuotaSnapshot(queriedAt:Date().addingTimeInterval(-3600),windows:[])
+    snapshot.identityFingerprint="synthetic-only";snapshot.bucketID="codex";app.snapshot=snapshot
+    app.errorText="synthetic unavailable"
+    app.detector.state.history=[ResetRecord(id:"fixture",identityFingerprint:"synthetic-only",bucketID:"codex",window:"primary",durationMinutes:300,detectedAt:Date(),previousServiceResetAt:1,serviceResetAt:2,previousUsedPercent:50,usedPercent:0,acknowledgedAt:nil)]
+    app.reconcileCelebration()
+    guard app.confetti.panel != nil,app.realPending.count==1 else {fatalError("confirmed reset must survive stale quota")}
+    let presenterCount=app.confetti.presentationCount
+    app.reconcileCelebration()
+    guard app.confetti.presentationCount==presenterCount else {fatalError("notice must not restart on refresh")}
+    guard let notice=app.confetti.panel?.contentView as? ResetNoticeView else {fatalError("clickable notice required")}
+    notice.onClick()
+    guard app.realPending.isEmpty,app.confetti.panel==nil,app.detector.state.history.first?.acknowledgedAt != nil else {fatalError("click must acknowledge and close")}
+    print("PASS reset notice: stale quota persistence, stable refresh, click acknowledgment; synthetic only")
 }
