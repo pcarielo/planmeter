@@ -1,5 +1,14 @@
 # Alterações
 
+## 1.4.1 - 2026-10-24
+
+- Reduzir Movimento respeitado por padrão em instalações novas.
+- Contas mostra Conectado em verde ou Conectar em cinza, com textos maiores e sem status de cache duplicado.
+- Configurações participa do seletor de aplicativos enquanto estiver aberta.
+- Sobre identifica Paulo Carielo como desenvolvedor.
+- Painel usa cartões compactos, percentuais alinhados à direita e informações de atualização padronizadas.
+- Grok distingue créditos unificados, créditos do Grok Build e tipo não informado, sem somar créditos adicionais.
+
 ## 1.4.0 - 2026-10-22
 
 - Configurações nativas com Geral, Contas, Aparência, Avisos e Sobre, acessíveis por `⌘,`.

@@ -73,9 +73,9 @@ private struct SettingsRootView: View {
             Form {
                 Section("Inicialização") {
                     Toggle("Abrir ao iniciar a sessão",isOn:Binding(get:{model.loginEnabled || model.loginPending},set:{model.setLogin($0)})).disabled(model.legacyLogin && !model.loginEnabled && !model.loginPending)
-                    if model.legacyLogin {Text("Há um início automático configurado pelo instalador anterior. Desative essa configuração pelo script login-item.sh antes de ativar a opção nativa.").font(.caption)}
-                    Text("Desativado por padrão. O macOS pode pedir aprovação para esta instalação.").font(.caption).foregroundColor(.secondary)
-                    if !model.loginMessage.isEmpty {Text(model.loginMessage).font(.caption)}
+                    if model.legacyLogin {Text("Há um início automático configurado pelo instalador anterior. Desative essa configuração pelo script login-item.sh antes de ativar a opção nativa.").font(.system(size:13))}
+                    Text("Desativado por padrão. O macOS pode pedir aprovação para esta instalação.").font(.system(size:13)).foregroundColor(.secondary)
+                    if !model.loginMessage.isEmpty {Text(model.loginMessage).font(.system(size:13))}
                     Button("Abrir Itens de Início do macOS") {if !model.isTest {SMAppService.openSystemSettingsLoginItems()}}
                 }
                 Section("Atualizações de quota") {
@@ -93,28 +93,29 @@ private struct SettingsRootView: View {
                 Section("Painel") {
                     Toggle("Manter o painel fixado",isOn:$model.interface.pinned)
                     Picker("Fechar quando não estiver fixado",selection:$model.interface.dismissal) {Text("15 segundos").tag(15.0);Text("30 segundos").tag(30.0);Text("60 segundos").tag(60.0)}
-                    Text("Fixado, o painel pode ser arrastado pela faixa superior. Fechar o painel desativa a fixação. Tema, tamanho e prazo de fechamento são preservados ao reiniciar.").font(.caption).foregroundColor(.secondary)
+                    Text("Fixado, o painel pode ser arrastado pela faixa superior. Fechar o painel desativa a fixação. Tema, tamanho e prazo de fechamento são preservados ao reiniciar.").font(.system(size:13)).foregroundColor(.secondary)
                 }
             }.formStyle(.grouped).tabItem{Label("Aparência",systemImage:"paintbrush")}.tag("appearance")
             Form {
                 Section("Renovação de quota") {
                     Toggle("Animar o confete dos avisos de reset",isOn:$model.confetti)
                     Toggle("Respeitar Reduzir Movimento do macOS",isOn:$model.respectMotion)
-                    Text("O aplicativo apenas observa renovações. Não executa resets nem consome modelos para testar limites.").font(.caption).foregroundColor(.secondary)
+                    Text("O aplicativo apenas observa renovações. Não executa resets nem consome modelos para testar limites.").font(.system(size:13)).foregroundColor(.secondary)
                 }
             }.formStyle(.grouped).tabItem{Label("Avisos",systemImage:"bell")}.tag("notifications")
             VStack(spacing:16) {
                 Image(systemName:"gauge").font(.system(size:48)).foregroundColor(.accentColor)
                 Text("PlanMeter").font(.largeTitle.bold())
+                Text("Desenvolvido por Paulo Carielo").font(.system(size:16))
                 Text("Versão " + (Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "local"))
                 Text("Monitor local de quotas. Chaves no Keychain, leituras sem prompts de modelo e dados de quota mantidos neste Mac.").multilineTextAlignment(.center).foregroundColor(.secondary)
                 Link("Privacidade e segurança",destination:URL(string:"https://github.com/pcarielo/planmeter/blob/main/docs/security.md")!)
                 Link("Suporte e código-fonte",destination:URL(string:"https://github.com/pcarielo/planmeter")!)
             }.padding(44).tabItem{Label("Sobre",systemImage:"info.circle")}.tag("about")
-        }.padding(12).frame(width:660,height:610)
+        }.font(.system(size:15)).padding(12).frame(width:660,height:610)
     }
 }
-final class SettingsWindow {
+final class SettingsWindow: NSObject, NSWindowDelegate {
     let model=SettingsModel()
     private(set) var window:NSWindow?
     private var keyObserver:NSObjectProtocol?
@@ -122,17 +123,20 @@ final class SettingsWindow {
         model.selected=page
         if window==nil {
             let window=NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:610),styleMask:[.titled,.closable,.miniaturizable],backing:.buffered,defer:false)
-            window.title="Configurações do PlanMeter";window.level = .floating;window.isReleasedWhenClosed=false
+            window.title="Configurações do PlanMeter";window.delegate=self;window.level = .floating;window.isReleasedWhenClosed=false
             window.contentViewController=NSHostingController(rootView:SettingsRootView(model:model));window.center();self.window=window
             keyObserver=NotificationCenter.default.addObserver(forName:NSWindow.didBecomeKeyNotification,object:window,queue:.main){[weak self] _ in self?.model.refreshLogin()}
         }
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps:true);window?.makeKeyAndOrderFront(nil)
     }
+    func windowWillClose(_ notification:Notification) {NSApp.setActivationPolicy(.accessory)}
     deinit {if let observer=keyObserver {NotificationCenter.default.removeObserver(observer)}}
 }
 func runSettingsTests() {
     var count=0
     func check(_ value:Bool,_ text:String){guard value else{fputs("FAIL settings: \(text)\n",stderr);exit(1)};count += 1}
+    check(CelebrationPreferences().respectReduceMotion,"new installations respect reduce motion")
     var value=InterfacePreferences();value.scale=1.5;value.dismissal=30;value.pinned=true;value.appearance="dark"
     let restored=try! JSONDecoder().decode(InterfacePreferences.self,from:JSONEncoder().encode(value))
     check(restored==value,"preferences round trip")
@@ -147,5 +151,9 @@ func runSettingsTests() {
     model.setLogin(true);check(!model.loginEnabled,"tests never register login item")
     check(SettingsModel.installedLocation("/Applications/PlanMeter.app",home:"/fixture"),"installed app eligible for login item")
     check(!SettingsModel.installedLocation("/tmp/PlanMeter.app",home:"/fixture"),"temporary build cannot register login item")
+    let settings=SettingsWindow();settings.show(page:"about")
+    check(NSApp.activationPolicy() == .regular,"settings participate in app switching")
+    settings.window?.close()
+    check(NSApp.activationPolicy() == .accessory,"closing settings restores menu bar mode")
     print("PASS Settings: \(count) checks; no login-item changes")
 }

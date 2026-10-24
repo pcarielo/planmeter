@@ -113,6 +113,6 @@ func countdownLabel(reset: Double?, now: Date = Date()) -> String {
 }
 struct CelebrationPreferences: Codable {
     var loopEnabled = true
-    // Paulo explicitly opted into movement within this app; the OS setting is never modified.
-    var respectReduceMotion = false
+    // New installations respect the system accessibility preference.
+    var respectReduceMotion = true
 }

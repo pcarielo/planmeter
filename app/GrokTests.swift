@@ -41,5 +41,16 @@ func runGrokTests() {
     }
     let cancelled=GrokClient(binary:fake.path);cancelled.cancel()
     do {_=try cancelled.read();check(false,"cancelled process launched")}catch{check(!cancelled.didLaunch,"pre-launch cancellation prevents process creation")}
+    var nonUnified=result(25)
+    var config=nonUnified["config"] as! [String:Any];config["isUnifiedBillingUser"]=false
+    config["currentPeriod"]=["type":"USAGE_PERIOD_TYPE_MONTHLY"]
+    nonUnified["config"]=config
+    let build=try! parseGrok(nonUnified).snapshot
+    check(build.bucketID=="grok:build" && build.windows.first?.name=="Mensal","non-unified included Build credits")
+    check(grokMeasurementDescription(build).contains("Grok Build"),"non-unified scope explicit")
+    config.removeValue(forKey:"isUnifiedBillingUser");nonUnified["config"]=config
+    let unknown=try! parseGrok(nonUnified).snapshot
+    check(unknown.bucketID=="grok:unknown" && grokMeasurementNote(unknown).contains("não informado"),"absent flag never means non-unified")
+    check(reading.snapshot.windows.first?.name=="Semanal","official weekly label")
     print("PASS Grok: \(count) checks; fixture CLI, no real credentials or model")
 }

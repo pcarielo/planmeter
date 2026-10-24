@@ -5,7 +5,15 @@ struct QuotaCard {
     let snapshot: QuotaSnapshot
     let stale: Bool
     var note: String? = nil
-    var windows: [QuotaWindow] { snapshot.windows.filter { $0.remaining.map { $0.isFinite && $0 >= 0 && $0 <= 100 } ?? false } }
+    var windows: [QuotaWindow] { snapshot.windows.filter { $0.remaining.map { $0.isFinite && $0 >= 0 && $0 <= 100 } ?? false }.sorted { ($0.durationMinutes ?? Int.max) < ($1.durationMinutes ?? Int.max) } }
+    static func windowLabel(_ window:QuotaWindow)->String {
+        if window.name.localizedCaseInsensitiveContains("MCP") {return "MCP"}
+        return window.durationMinutes.map {$0 == 10080 ? "Semanal" : durationLabel($0)} ?? window.name
+    }
+    var detail:String? {
+        let parts=[stale ? "Dados desatualizados" : nil,note].compactMap {$0}
+        return parts.isEmpty ? nil : parts.joined(separator:" · ")
+    }
     static func available(_ values: [QuotaCard]) -> [QuotaCard] { values.filter { !$0.windows.isEmpty } }
 }
 
@@ -15,17 +23,27 @@ final class QuotaDashboardView: NSView {
     var dismiss: () -> Void = {}
     var pinned=false
     override var isFlipped: Bool { true }
-    static func rowHeight(_ cards: [QuotaCard]) -> CGFloat { CGFloat(78 + (cards.map { $0.windows.count }.max() ?? 0) * 90) }
+    static func cardHeight(_ card:QuotaCard)->CGFloat {CGFloat(76 + card.windows.count * 96 + (card.detail == nil ? 0 : 24))}
+    static func cardFrames(_ cards:[QuotaCard],width:CGFloat)->[NSRect] {
+        let columns=width < 500 ? 1 : 2
+        let cardWidth=(width-40-CGFloat(columns-1)*12)/CGFloat(columns)
+        var nextY=Array(repeating:CGFloat(76),count:columns)
+        return cards.enumerated().map {index,card in
+            let column=index % columns
+            let rect=NSRect(x:20+CGFloat(column)*(cardWidth+12),y:nextY[column],width:cardWidth,height:cardHeight(card))
+            nextY[column]=rect.maxY+12
+            return rect
+        }
+    }
     init(cards: [QuotaCard], width: CGFloat) {
         self.cards=cards;columns=width < 500 ? 1 : 2
-        var height:CGFloat=76
-        for index in stride(from:0,to:cards.count,by:columns) { height += Self.rowHeight(Array(cards[index..<min(index+columns,cards.count)])) + 12 }
-        super.init(frame:NSRect(x:0,y:0,width:width,height:max(150,height+30)))
+        let bottom=Self.cardFrames(cards,width:width).map(\.maxY).max() ?? 112
+        super.init(frame:NSRect(x:0,y:0,width:width,height:bottom+38))
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         let summaries: [String] = cards.map { card in
             let windows: [String] = card.windows.map { window in
-                durationLabel(window.durationMinutes) + " " + percentLabel(window.remaining)
+                QuotaCard.windowLabel(window) + " " + percentLabel(window.remaining)
             }
             let freshness = card.stale ? ", dados desatualizados" : ""
             return card.name + freshness + ": " + windows.joined(separator:", ")
@@ -34,41 +52,35 @@ final class QuotaDashboardView: NSView {
     }
     required init?(coder:NSCoder) { fatalError("init(coder:) not supported") }
     override func mouseDown(with event:NSEvent) { dismiss() }
-    private func text(_ value:String,_ rect:NSRect,_ size:CGFloat,_ color:NSColor = .labelColor,_ weight:NSFont.Weight = .regular) {
-        let style=NSMutableParagraphStyle();style.lineBreakMode = .byTruncatingTail
-        (value as NSString).draw(in:rect,withAttributes:[.font:NSFont.systemFont(ofSize:size,weight:weight),.foregroundColor:color,.paragraphStyle:style])
+    private func text(_ value:String,_ rect:NSRect,_ size:CGFloat,_ color:NSColor = .labelColor,_ weight:NSFont.Weight = .regular,alignment:NSTextAlignment = .left,monospaced:Bool=false) {
+        let style=NSMutableParagraphStyle();style.lineBreakMode = .byTruncatingTail;style.alignment=alignment
+        (value as NSString).draw(in:rect,withAttributes:[.font:monospaced ? NSFont.monospacedDigitSystemFont(ofSize:size,weight:weight) : NSFont.systemFont(ofSize:size,weight:weight),.foregroundColor:color,.paragraphStyle:style])
     }
     override func draw(_ dirtyRect:NSRect) {
         NSColor.windowBackgroundColor.setFill();bounds.fill()
         text("Disponibilidade",NSRect(x:20,y:18,width:bounds.width-40,height:26),20,.labelColor,.semibold)
         text("Saldo restante por janela de uso",NSRect(x:20,y:46,width:bounds.width-40,height:18),12,.secondaryLabelColor)
         if cards.isEmpty { text("Nenhuma métrica disponível no momento.",NSRect(x:20,y:88,width:bounds.width-40,height:24),13,.secondaryLabelColor) }
-        let width=(bounds.width-40-CGFloat(columns-1)*12)/CGFloat(columns)
-        var y:CGFloat=76
-        for start in stride(from:0,to:cards.count,by:columns) {
-            let row=Array(cards[start..<min(start+columns,cards.count)])
-            let height=Self.rowHeight(row)
-            for (column,card) in row.enumerated() {
-                let x=20+CGFloat(column)*(width+12), rect=NSRect(x:x,y:y,width:width,height:height)
+        for (card,rect) in zip(cards,Self.cardFrames(cards,width:bounds.width)) {
+                let x=rect.minX,y=rect.minY,width=rect.width
                 NSColor.labelColor.withAlphaComponent(0.055).setFill();NSBezierPath(roundedRect:rect,xRadius:12,yRadius:12).fill()
                 NSColor.separatorColor.withAlphaComponent(0.35).setStroke();NSBezierPath(roundedRect:rect.insetBy(dx:0.5,dy:0.5),xRadius:12,yRadius:12).stroke()
                 if let icon=StatusPresentation.icons[card.key] { icon.draw(in:NSRect(x:x+14,y:y+14,width:20,height:20),from:.zero,operation:.sourceOver,fraction:1,respectFlipped:true,hints:nil) }
                 text(card.name,NSRect(x:x+42,y:y+14,width:width-54,height:22),15,.labelColor,.semibold)
-                text(card.stale ? "Desatualizado · " + localDate(card.snapshot.queriedAt) : (card.note ?? "Observado " + localDate(card.snapshot.queriedAt)),NSRect(x:x+14,y:y+42,width:width-28,height:18),10,card.stale ? .systemOrange : .secondaryLabelColor)
+                text("Atualizado em " + localDate(card.snapshot.queriedAt),NSRect(x:x+14,y:y+42,width:width-28,height:18),11,.secondaryLabelColor)
                 for (index,window) in card.windows.enumerated() {
-                    let top=y+70+CGFloat(index)*90, remaining=window.remaining!
-                    let label=window.durationMinutes.map { $0==10080 ? "Semanal" : durationLabel($0) } ?? window.name
-                    text(label,NSRect(x:x+14,y:top,width:width-100,height:20),12,.secondaryLabelColor,.medium)
-                    text(percentLabel(remaining),NSRect(x:x+width-78,y:top-4,width:64,height:27),21,.labelColor,.semibold)
+                    let top=y+76+CGFloat(index)*96, remaining=window.remaining!
+                    let label=QuotaCard.windowLabel(window)
+                    text(label,NSRect(x:x+14,y:top,width:width-116,height:20),12,.secondaryLabelColor,.medium)
+                    text(percentLabel(remaining),NSRect(x:x+width-96,y:top-4,width:82,height:27),21,.labelColor,.semibold,alignment:.right,monospaced:true)
                     let track=NSRect(x:x+14,y:top+25,width:width-28,height:5)
                     NSColor.quaternaryLabelColor.setFill();NSBezierPath(roundedRect:track,xRadius:2.5,yRadius:2.5).fill()
                     (remaining <= 10 ? NSColor.systemRed : remaining <= 25 ? NSColor.systemOrange : NSColor.systemGreen).setFill()
                     if remaining>0 {NSBezierPath(roundedRect:NSRect(x:track.minX,y:track.minY,width:track.width*remaining/100,height:5),xRadius:2.5,yRadius:2.5).fill()}
-                    text(window.reset.map { "Reset: " + localDate(Date(timeIntervalSince1970:$0)) } ?? "Reset não informado",NSRect(x:x+14,y:top+37,width:width-28,height:18),10,.secondaryLabelColor)
+                    text(window.reset.map { "Renovação: " + localDate(Date(timeIntervalSince1970:$0)) } ?? "Renovação não informada",NSRect(x:x+14,y:top+37,width:width-28,height:18),10,.secondaryLabelColor)
                     if window.reset != nil { text(countdownLabel(reset:window.reset),NSRect(x:x+14,y:top+54,width:width-28,height:18),10,.secondaryLabelColor) }
                 }
-            }
-            y += height+12
+                if let detail=card.detail {text(detail,NSRect(x:x+14,y:rect.maxY-26,width:width-28,height:18),11,card.stale ? .systemOrange : .secondaryLabelColor)}
         }
         text(pinned ? "Fixado · arraste a faixa superior para mover" : "Clique no conteúdo para fechar",NSRect(x:20,y:bounds.height-26,width:bounds.width-40,height:18),10,.secondaryLabelColor)
     }
@@ -193,6 +205,11 @@ func runQuotaDashboardTests() {
     let view=QuotaDashboardView(cards:QuotaCard.available(cards),width:600)
     check(view.columns==2 && view.frame.height>200,"card layout")
     check(QuotaDashboardView(cards:[],width:400).columns==1,"narrow screen layout")
+    let compact=[cards[0],QuotaCard(key:"other",name:"Other",snapshot:zero,stale:false),cards[0]]
+    let frames=QuotaDashboardView.cardFrames(compact,width:600)
+    check(frames[1].height<frames[0].height,"card height follows own content")
+    check(frames[2].minY==frames[0].maxY+12,"columns stack without shared row whitespace")
+    check(QuotaCard.windowLabel(QuotaWindow(name:"Uso MCP (janela não informada)",remaining:100,durationMinutes:nil,reset:nil))=="MCP","MCP label stays short")
     guard let screen=NSScreen.main else {fatalError("screen required")}
     let dashboard=QuotaDashboard();dashboard.cards=cards
     let anchor=NSRect(x:screen.visibleFrame.maxX-100,y:screen.visibleFrame.maxY,width:80,height:20)

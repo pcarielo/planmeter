@@ -10,7 +10,7 @@ O PlanMeter é um aplicativo Swift/AppKit que mostra o saldo disponível, as jan
 
 Clique no indicador para abrir o painel completo. Só aparecem provedores com percentuais válidos, tanto na barra quanto no painel. Saldo de **0%** continua visível. Se nenhuma métrica estiver disponível, a barra mostra apenas **PlanMeter**, mantendo o acesso à configuração.
 
-![Painel completo com dados fictícios e ícones de iniciais](docs/images/dashboard.png)
+![Painel completo com dados fictícios](docs/images/dashboard.png)
 
 - **Atualizar** solicita novas leituras, respeitando os intervalos de cada provedor.
 - **Fixar** mantém a janela aberta e permite movê-la pela faixa superior. **Desafixar** reativa o prazo configurado para fechamento, de 15 segundos por padrão.
@@ -59,7 +59,7 @@ O aplicativo ainda não tem assinatura Developer ID nem notarização. O build l
 
 ## Configuração dos provedores
 
-![Configurações de aparência, com preferências de demonstração](docs/images/settings.png)
+![Contas nas Configurações, com conexões de demonstração](docs/images/settings.png)
 
 Abra **Configurações → Contas** no painel ou use `⌘,` com a janela do aplicativo ativa. Todos os provedores aparecem nessa janela de configuração, inclusive os que ainda não têm métricas. Isso permite conectar uma conta sem encher a barra de indicadores vazios.
 

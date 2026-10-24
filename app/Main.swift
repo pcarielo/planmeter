@@ -137,7 +137,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 claudeSnapshot.map {QuotaCard(key:"claude",name:"Claude",snapshot:$0,stale:stale($0,error:claudeError))},
                 zaiSnapshot.map {QuotaCard(key:"zai",name:"Z.ai",snapshot:$0,stale:stale($0,error:zaiError))},
                 kimi.snapshot.map {QuotaCard(key:"kimi",name:"Kimi Code",snapshot:$0,stale:kimi.stale)},
-                grok.snapshot.map {QuotaCard(key:"grok",name:$0.bucketID=="grok:unified" ? "Grok Unified" : "Grok",snapshot:$0,stale:grok.stale,note:($0.bucketID=="grok:unified" ? "Quota compartilhada · " : "Assinatura · ") + localDate($0.queriedAt))}
+                grok.snapshot.map {QuotaCard(key:"grok",name:"Grok",snapshot:$0,stale:grok.stale,note:grokMeasurementNote($0))}
             ].compactMap {$0}
         dashboard.onAccess = { [weak self] in guard let self=self else{return};self.showSettings(page:QuotaCard.available(self.dashboard.cards).isEmpty ? "accounts" : "general") }
         dashboard.onRefresh = { [weak self] in self?.manualRefresh() }
@@ -154,12 +154,22 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ProviderAccess(key:"claude",name:"Claude Code",status:status(claudeSnapshot),detail:"Cache de quota alimentado pela statusline do Claude Code.",actionTitle:"Configurar"),
             ProviderAccess(key:"zai",name:"Z.ai",status:status(zaiSnapshot),detail:"Chave no Keychain deste Mac.",actionTitle:KeychainStore.needsAuthorization ? "Autorizar acesso" : "Cadastrar chave",enabled:!zaiBusy,actions:["authorize","remove"]),
             ProviderAccess(key:"kimi",name:"Kimi Code",status:kimi.errorText ?? status(kimi.snapshot),detail:"Chave do Coding Plan no Keychain. OAuth preservado.",actionTitle:KimiKeychain.needsAuthorization ? "Autorizar acesso" : "Cadastrar chave",enabled:!kimi.busy,actions:["authorize","remove"]),
-            ProviderAccess(key:"grok",name:"Grok Unified",status:status(grok.snapshot),detail:"Login da assinatura pelo Grok Build oficial.",actionTitle:"Como conectar")
+            ProviderAccess(key:"grok",name:"Grok",status:status(grok.snapshot),detail:grokMeasurementDescription(grok.snapshot),actionTitle:"Como conectar")
         ]
+        let connected:[String:Bool] = [
+            "codex":StatusPresentation.validRemaining(snapshot) != nil && errorText == nil,
+            "claude":StatusPresentation.validRemaining(claudeSnapshot) != nil && claudeError == nil,
+            "claude-remote":StatusPresentation.validRemaining(claudeSnapshot) != nil && claudeError == nil,
+            "zai":StatusPresentation.validRemaining(zaiSnapshot) != nil && zaiError == nil,
+            "kimi":StatusPresentation.validRemaining(kimi.snapshot) != nil && kimi.errorText == nil,
+            "grok":StatusPresentation.validRemaining(grok.snapshot) != nil && grok.errorText == nil
+        ]
+        for index in accessSetup.providers.indices {accessSetup.providers[index].connected=connected[accessSetup.providers[index].key] ?? false}
         accessSetup.onConfigure = { [weak self] key in
             switch key {
             case "zai:authorize":self?.authorizeZai()
             case "zai:remove":self?.removeZai()
+            case "grok":AccessSetup.guide("grok",measurement:grokMeasurementExplanation(self?.grok.snapshot))
             case "kimi:authorize":self?.kimi.authorizeAccess()
             case "kimi:remove":self?.kimi.removeKey()
             case "kimi":if KimiKeychain.needsAuthorization {self?.kimi.authorizeAccess()} else {self?.kimi.configure()}
