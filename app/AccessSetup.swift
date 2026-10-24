@@ -2,8 +2,20 @@ import AppKit
 
 struct ProviderAccess: Equatable {
     let key:String, name:String, status:String, detail:String, actionTitle:String
+    var connected=false
     var enabled=true
     var actions:[String]=[]
+}
+final class ConnectionButton: NSButton {
+    var connected=false
+    override func draw(_ dirtyRect:NSRect) {
+        let color=connected ? NSColor.systemGreen : NSColor.systemGray
+        color.withAlphaComponent(isEnabled ? (isHighlighted ? 0.75 : 1) : 0.45).setFill()
+        NSBezierPath(roundedRect:bounds.insetBy(dx:1,dy:1),xRadius:7,yRadius:7).fill()
+        let paragraph=NSMutableParagraphStyle();paragraph.alignment = .center
+        let text=NSAttributedString(string:title,attributes:[.font:NSFont.systemFont(ofSize:14,weight:.semibold),.foregroundColor:NSColor.white,.paragraphStyle:paragraph])
+        text.draw(in:NSRect(x:2,y:(bounds.height-text.size().height)/2,width:bounds.width-4,height:text.size().height))
+    }
 }
 final class AccessSetup: NSObject {
     private(set) var panel:NSPanel?
@@ -22,16 +34,15 @@ final class AccessSetup: NSObject {
         func label(_ text:String,_ frame:NSRect,_ size:CGFloat,_ bold:Bool=false)->NSTextField {
             let label=NSTextField(wrappingLabelWithString:text);label.frame=frame;label.font = .systemFont(ofSize:size,weight:bold ? .semibold : .regular);view.addSubview(label);return label
         }
-        _=label("Conecte os serviços que você usa",NSRect(x:22,y:height-48,width:width-44,height:26),19,true)
-        _=label("Sem métrica, o provedor fica oculto na barra e no painel.",NSRect(x:22,y:height-73,width:width-44,height:20),12)
+        _=label("Conecte os serviços que você usa",NSRect(x:22,y:height-48,width:width-44,height:26),21,true)
+        _=label("Sem métrica, o provedor fica oculto na barra e no painel.",NSRect(x:22,y:height-73,width:width-44,height:20),13)
         for (index,provider) in providers.enumerated() {
             let y=height-163-CGFloat(index)*87
-            _=label(provider.name,NSRect(x:22,y:y+49,width:180,height:23),14,true)
-            let status=label(provider.status,NSRect(x:210,y:y+51,width:width-236,height:20),11);status.textColor = .secondaryLabelColor
-            _=label(provider.detail,NSRect(x:22,y:y+4,width:width-(provider.actions.isEmpty ? 188 : 230),height:43),11)
-            let action=NSButton(title:provider.actionTitle,target:self,action:#selector(configure(_:)));action.tag=index;action.isEnabled=provider.enabled;action.bezelStyle = .rounded;action.frame=NSRect(x:width-(provider.actions.isEmpty ? 152 : 194),y:y+9,width:128,height:30);view.addSubview(action)
+            _=label(provider.name,NSRect(x:22,y:y+49,width:180,height:23),16,true)
+            _=label(provider.detail,NSRect(x:22,y:y+4,width:width-(provider.actions.isEmpty ? 188 : 230),height:43),13)
+            let action=ConnectionButton(title:provider.connected ? "Conectado" : "Conectar",target:self,action:#selector(configure(_:)));action.connected=provider.connected;action.tag=index;action.isEnabled=provider.enabled;action.bezelStyle = .rounded;action.font = .systemFont(ofSize:14,weight:.medium);action.bezelColor=provider.connected ? .systemGreen : .systemGray;action.contentTintColor = .white;action.setAccessibilityLabel(provider.name + (provider.connected ? ", conectado" : ", conectar"));action.frame=NSRect(x:width-(provider.actions.isEmpty ? 152 : 194),y:y+39,width:128,height:30);view.addSubview(action)
             if !provider.actions.isEmpty {
-                let more=NSPopUpButton(frame:NSRect(x:width-54,y:y+9,width:32,height:30),pullsDown:true)
+                let more=NSPopUpButton(frame:NSRect(x:width-54,y:y+39,width:32,height:30),pullsDown:true)
                 more.addItem(withTitle:"•••");more.isEnabled=provider.enabled
                 for action in provider.actions {
                     let label=action=="authorize" ? "Autorizar acesso" : "Remover chave…"
@@ -61,10 +72,10 @@ final class AccessSetup: NSObject {
         default: return("A conexão deste provedor é gerenciada no serviço remoto. Ajuste a autenticação pelo fluxo seguro usado naquele host.","","")
         }
     }
-    static func guide(_ key:String) {
+    static func guide(_ key:String,measurement:String?=nil) {
         let (detail,command,url)=instruction(for:key)
         let alert=NSAlert();alert.messageText="Conectar " + key.capitalized
-        alert.informativeText=detail + (command.isEmpty ? "" : "\n\n"+command)
+        alert.informativeText=(measurement.map {$0 + "\n\n"} ?? "") + detail + (command.isEmpty ? "" : "\n\n"+command)
         alert.addButton(withTitle:"Fechar")
         if !command.isEmpty {alert.addButton(withTitle:"Copiar comando")}
         if !url.isEmpty {alert.addButton(withTitle:"Abrir guia oficial")}
@@ -94,5 +105,12 @@ func runAccessTests() {
     check(AccessSetup.instruction(for:"grok").1=="grok login","subscription login guide")
     let dashboard=QuotaDashboard();var opened=false;dashboard.onAccess={opened=true};dashboard.openAccess()
     check(opened,"dashboard setup accessible without data")
+    let view=access.makeContentView()
+    let connect=view.subviews.compactMap {$0 as? NSButton}.first {$0.title=="Conectar"}
+    check(connect?.bezelColor == NSColor.systemGray,"disconnected action is gray")
+    access.providers[0].connected=true
+    let connected=access.makeContentView().subviews.compactMap {$0 as? NSButton}.first {$0.title=="Conectado"}
+    check(connected?.bezelColor == NSColor.systemGreen,"connected action is green")
+    check(!view.subviews.compactMap {$0 as? NSTextField}.contains {$0.stringValue=="Sem métrica"},"connection status uses button only")
     print("PASS access/visibility: \(count) checks; no credentials, clipboard or login")
 }

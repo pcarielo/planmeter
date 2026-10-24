@@ -58,10 +58,23 @@ O monitor não altera planos, compra créditos ou executa resets. Nenhum provedo
 
 Essas interfaces podem mudar. Ausência de dados deve ser investigada sem criar sessões de modelo ou copiar credenciais de outros aplicativos.
 
-## Grok Unified
+## Grok: alcance da medição
 
-O PlanMeter usa o Grok Build oficial já autenticado por `grok login`. A consulta envia apenas `initialize` e `_x.ai/billing` pelo protocolo ACP. Não cria sessão de conversa nem envia prompts. O cliente oficial mantém a autenticação; o PlanMeter não lê arquivos de tokens ou cookies.
+O PlanMeter consulta o Grok Build oficial autenticado, usando somente `initialize` e `_x.ai/billing`. O percentual corresponde ao saldo de uso incluído retornado em `creditUsagePercent`; o período e a renovação vêm de `currentPeriod`. A consulta não informa uma divisão do percentual por produto.
 
-O percentual vem de `creditUsagePercent`, e o reset de `currentPeriod.end`. Quando `isUnifiedBillingUser` confirma a assinatura unificada, o cartão identifica a quota compartilhada entre produtos elegíveis. O aplicativo não soma quatro quotas nem converte créditos da API em saldo da assinatura. Sem dado válido, não apresenta zero. Consultas automáticas usam 15 minutos; manuais respeitam 60 segundos.
+O cartão usa períodos em português: **Semanal**, **Mensal** e **Uso incluído**, quando o período não é identificado. O nome é Grok; o tipo de crédito aparece separadamente.
 
-Instale o [Grok Build oficial](https://docs.x.ai/build/overview), conclua `grok login` e abra o PlanMeter. O aplicativo procura o executável em `~/.grok/bin`, `~/.local/bin`, `/opt/homebrew/bin` e `/usr/local/bin`.
+- `isUnifiedBillingUser=true`: **Créditos unificados**. A medição cobre a reserva compartilhada dos produtos elegíveis da assinatura. Em The X Subscription, a documentação inclui uso próprio elegível de Grok e Cursor, conforme o plano. Não presumimos os mesmos produtos para toda conta.
+- `isUnifiedBillingUser=false`: **Créditos do Grok Build**, incluídos na assinatura. A medição não soma cotas de Chat, Imagine, Voice, Bot, Cursor ou outros produtos.
+- Campo ausente: **Tipo de crédito não informado**. Ausência não é tratada como uma confirmação de conta não unificada. Caches antigos sem essa distinção também mostram o estado não informado até a próxima consulta válida.
+
+Créditos adicionais comprados (Extra Usage Credits), saldo pré-pago e consumo adicional cobrado à parte (Pay-as-you-go/Additional Usage) não são somados ao percentual. Eles possuem campos e controles separados no provedor. Contas mostra o alcance resumido, e o botão do Grok abre a explicação da medição junto às instruções de conexão.
+
+A coleta automática usa intervalo de 15 minutos; a manual respeita 60 segundos. O aplicativo procura o executável em `~/.grok/bin`, `~/.local/bin`, `/opt/homebrew/bin` e `/usr/local/bin`. Não lê arquivos de tokens nem cria sessões de conversa.
+
+Fontes oficiais verificadas em 23/10/2026:
+
+- [Rótulos de uso do Grok Build](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/src/views/credit_bar.rs)
+- [Contrato de billing do Grok Build](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-shell/src/extensions/billing.rs)
+- [Limites do Grok](https://docs.x.ai/grok/faq#how-do-supergroks-weekly-usage-limits-work)
+- [Limites de The X Subscription](https://docs.x.ai/x-subscription/usage-limits)
