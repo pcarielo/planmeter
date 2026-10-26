@@ -13,12 +13,29 @@ struct RenewalEntry: Codable, Equatable {
     var recordedAt:Date
     var startReported=false
     var detectedBetweenReadings=false
+    var inferenceAdjusted=false
     var evidence:String {
-        (detectedBetweenReadings ? "Detectado entre leituras · " : "") + (startReported ? "início informado" : "início inferido")
+        (detectedBetweenReadings ? "Detectado entre leituras · " : "") + (startReported ? "início informado" : "início inferido") + (inferenceAdjusted && !detectedBetweenReadings && !startReported ? " · prazo alterado" : "")
     }
     var scopeLabel:String {identity.map {"Conta "+String($0.prefix(8))} ?? "Conta não identificada"}
     var providerName:String { ["codex":"Codex","claude":"Claude","zai":"Z.ai","kimi":"Kimi Code","grok":"Grok"][provider] ?? provider }
 }
+extension RenewalEntry {
+    enum CodingKeys:String,CodingKey {case id,provider,bucket,identity,window,minutes,startedAt,endsAt,recordedAt,startReported,detectedBetweenReadings,inferenceAdjusted}
+    init(from decoder:Decoder) throws {
+        let c=try decoder.container(keyedBy:CodingKeys.self)
+        id=try c.decodeIfPresent(String.self,forKey:.id) ?? UUID().uuidString
+        provider=try c.decode(String.self,forKey:.provider);bucket=try c.decode(String.self,forKey:.bucket)
+        identity=try c.decodeIfPresent(String.self,forKey:.identity);window=try c.decode(String.self,forKey:.window)
+        minutes=try c.decodeIfPresent(Int.self,forKey:.minutes)
+        startedAt=try c.decode(Double.self,forKey:.startedAt);endsAt=try c.decode(Double.self,forKey:.endsAt)
+        recordedAt=try c.decode(Date.self,forKey:.recordedAt)
+        startReported=try c.decodeIfPresent(Bool.self,forKey:.startReported) ?? false
+        detectedBetweenReadings=try c.decodeIfPresent(Bool.self,forKey:.detectedBetweenReadings) ?? false
+        inferenceAdjusted=try c.decodeIfPresent(Bool.self,forKey:.inferenceAdjusted) ?? false
+    }
+}
+
 struct RenewalHistory: Codable {
     var entries:[RenewalEntry]=[]
     static let providers=["codex","claude","zai","kimi","grok"]
@@ -30,7 +47,7 @@ struct RenewalHistory: Codable {
             entry.provider==value.provider && entry.window==value.window && entry.minutes==value.minutes &&
             (entry.identity==nil || value.identity==nil || entry.identity==value.identity) &&
             (entry.bucket==value.bucket || entry.bucket.contains("unknown") || value.bucket.contains("unknown") || entry.bucket=="grok:subscription") &&
-            abs(entry.endsAt-value.endsAt)<=tolerance && abs(entry.startedAt-value.startedAt)<=tolerance
+            abs(entry.endsAt-value.endsAt)<=tolerance
         }) {
             var updated=entries[index]
             if value.detectedBetweenReadings && !updated.detectedBetweenReadings {updated.detectedBetweenReadings=true;updated.recordedAt=value.recordedAt}
@@ -40,7 +57,19 @@ struct RenewalHistory: Codable {
             guard updated != entries[index] else{return false}
             entries[index]=updated;return true
         }
-        entries.append(value);return true
+        var candidate=value
+        if !candidate.startReported && !candidate.detectedBetweenReadings,
+           let index=entries.indices.filter({index in
+               let old=entries[index]
+               return old.provider==value.provider && old.window==value.window && old.minutes==value.minutes && old.identity==value.identity && old.bucket==value.bucket && value.startedAt<old.endsAt-tolerance && value.endsAt>old.startedAt+tolerance
+           }).max(by:{entries[$0].recordedAt<entries[$1].recordedAt}) {
+            candidate.inferenceAdjusted=true
+            if !entries[index].startReported && !entries[index].detectedBetweenReadings {
+                guard candidate.recordedAt>=entries[index].recordedAt else{return false}
+                candidate.id=entries[index].id;entries[index]=candidate;return true
+            }
+        }
+        entries.append(candidate);return true
     }
     @discardableResult mutating func ingest(_ snapshot:QuotaSnapshot)->Bool {
         guard Self.providers.contains(snapshot.effectiveProvider) else{return false}
@@ -84,7 +113,8 @@ struct RenewalHistory: Codable {
             let rows=recent(provider)
             if rows.isEmpty {sub.addItem(NSMenuItem(title:"Aguardando início ou duração de janela conhecidos",action:nil,keyEquivalent:""))}
             for row in rows {
-                let title=row.window+" · "+localDate(Date(timeIntervalSince1970:row.startedAt))
+                let tag=row.detectedBetweenReadings ? "detectado" : row.startReported ? "informado" : row.inferenceAdjusted ? "inferido · prazo alterado" : "inferido"
+                let title=row.window+" · "+localDate(Date(timeIntervalSince1970:row.startedAt))+" · "+tag
                 let item=NSMenuItem(title:title,action:nil,keyEquivalent:"");let detail=NSMenu()
                 for text in [row.evidence,"Próxima renovação: "+localDate(Date(timeIntervalSince1970:row.endsAt)),"Observado em: "+localDate(row.recordedAt),row.scopeLabel] {detail.addItem(NSMenuItem(title:text,action:nil,keyEquivalent:""))}
                 item.submenu=detail;sub.addItem(item)
@@ -186,6 +216,21 @@ func runRenewalHistoryTests() {
     let record=ResetRecord(id:"fixture",identityFingerprint:"synthetic-account",bucketID:"codex:quota",window:"5h",durationMinutes:300,detectedAt:now,previousServiceResetAt:1799985600,serviceResetAt:1800003600,previousUsedPercent:70,usedPercent:0,acknowledgedAt:nil)
     _ = merged.ingest(known);_ = merged.importDetection(record)
     check(merged.entries.count==1 && merged.entries[0].detectedBetweenReadings,"observed detection upgrades inference without duplication")
+    var corrected=RenewalHistory();_ = corrected.ingest(known)
+    var explicit=known;var explicitWindow=known.windows[0];explicitWindow.startedAt=1799985000
+    explicit=QuotaSnapshot(queriedAt:now,windows:[explicitWindow]);explicit.provider="codex";explicit.bucketID=known.bucketID;explicit.identityFingerprint=known.identityFingerprint
+    _ = corrected.ingest(explicit)
+    check(corrected.entries.count==1 && corrected.entries[0].startReported && corrected.entries[0].startedAt==1799985000,"provider start corrects an inference without a duplicate")
+    var sliding=RenewalHistory()
+    for offset in 0...20 {_ = sliding.ingest(snapshot("zai",1800003600+Double(offset)*60))}
+    check(sliding.entries.count==1 && sliding.entries[0].inferenceAdjusted,"overlapping inferred deadline shifts update one estimate")
+    func knownEntry(_ value:RenewalHistory)->RenewalEntry {value.entries[0]}
+    let latestEstimate=sliding.entries[0].endsAt
+    var oldEstimate=snapshot("zai",1800003600+150);oldEstimate=QuotaSnapshot(queriedAt:now.addingTimeInterval(-10),windows:oldEstimate.windows);oldEstimate.provider="zai";oldEstimate.bucketID="zai:quota"
+    check(!sliding.ingest(oldEstimate) && sliding.entries[0].endsAt==latestEstimate,"older cached data cannot rewind the latest estimate")
+    var legacy=try! JSONSerialization.jsonObject(with:JSONEncoder().encode(knownEntry(history))) as! [String:Any]
+    for key in ["id","startReported","detectedBetweenReadings","inferenceAdjusted"] {legacy.removeValue(forKey:key)}
+    check((try? JSONDecoder().decode(RenewalEntry.self,from:JSONSerialization.data(withJSONObject:legacy))) != nil,"optional metadata does not invalidate an old entry")
     print("PASS renewal history: \(count) checks; fixtures only")
 }
 func runRenewalHistoryUITests() {
@@ -195,5 +240,12 @@ func runRenewalHistoryUITests() {
     guard NSApp.activationPolicy() == .regular else{fatalError("history remains reachable after settings closes")}
     historyWindow.window?.close()
     guard NSApp.activationPolicy() == .accessory else{fatalError("last utility window restores menu bar mode")}
+    let directory=FileManager.default.temporaryDirectory.appendingPathComponent("history-corrupt-"+UUID().uuidString)
+    try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+    defer {try? FileManager.default.removeItem(at:directory)}
+    let corrupt=directory.appendingPathComponent("renewal-history.json");try! Data("invalid fixture".utf8).write(to:corrupt)
+    let app=MenuApp();app.cacheDirectory=directory;app.loadRenewalHistory()
+    let saved=try! FileManager.default.contentsOfDirectory(atPath:directory.path)
+    guard let backup=saved.first(where:{$0.hasPrefix("renewal-history.corrupt-")}), (try? Data(contentsOf:directory.appendingPathComponent(backup)))==Data("invalid fixture".utf8) else{fatalError("failed history decode must preserve original bytes")}
     print("PASS renewal history UI: independent window and activation lifecycle; no export dialog")
 }

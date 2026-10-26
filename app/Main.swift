@@ -12,6 +12,8 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var renewalHistory=RenewalHistory()
     private var importedRenewalDetections=Set<String>()
     private var renewalHistoryDirty=false
+    private var renewalHistoryWriteBlocked=false
+    private var renewalRecoveryMessage:String?
     var interfacePreferences=InterfacePreferences()
     var menu = NSMenu()
     var snapshot: QuotaSnapshot?
@@ -79,7 +81,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let data = try? Data(contentsOf: cacheFile) { snapshot = try? JSONDecoder().decode(QuotaSnapshot.self, from: data) }
         if let data = try? Data(contentsOf: resetFile), let state = try? JSONDecoder().decode(ResetState.self, from: data) { detector.state = state }
         if let data = try? Data(contentsOf: claudeResetFile), let state = try? JSONDecoder().decode(ResetState.self, from: data) { claudeDetector.state = state }
-        if let data=try? Data(contentsOf:cacheDirectory.appendingPathComponent("renewal-history.json")),let saved=try? JSONDecoder().decode(RenewalHistory.self,from:data) {renewalHistory=saved}
+        loadRenewalHistory()
         if let data = try? Data(contentsOf: preferencesFile), let pref = try? JSONDecoder().decode(CelebrationPreferences.self, from: data) { preferences = pref }
         if let data = try? Data(contentsOf: zaiFile), let cached = try? JSONDecoder().decode(ZaiReading.self, from: data) { zaiReading = cached; zaiSnapshot = cached.snapshot; zaiError = "Cache Z.ai; aguardando leitura" }
         errorText = snapshot == nil ? nil : "Dados em cache; aguardando leitura"
@@ -266,7 +268,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let usage = NSMenuItem(title: "Claude: abrir Settings → Usage", action: #selector(openClaudeUsage), keyEquivalent: "")
         usage.target = self; menu.addItem(usage)
         menu.addItem(NSMenuItem.separator())
-        let history = NSMenuItem(title: "Histórico de resets detectados", action: nil, keyEquivalent: "")
+        let history = NSMenuItem(title: "Histórico de renovações", action: nil, keyEquivalent: "")
         history.submenu = historyMenu(); menu.addItem(history)
         let ack = NSMenuItem(title: "Dispensar aviso/confete", action: #selector(acknowledge), keyEquivalent: "")
         ack.target = self; ack.isEnabled = demoPending || !realPending.isEmpty; menu.addItem(ack)
@@ -278,17 +280,29 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refresh.target = self; refresh.isEnabled = !policy.busy && !policy.sleeping; menu.addItem(refresh)
         let quit = NSMenuItem(title: "Sair", action: #selector(quitApp), keyEquivalent: "q"); quit.target = self; menu.addItem(quit)
     }
+    func loadRenewalHistory() {
+        let file=cacheDirectory.appendingPathComponent("renewal-history.json")
+        guard FileManager.default.fileExists(atPath:file.path) else{return}
+        do {renewalHistory=try JSONDecoder().decode(RenewalHistory.self,from:Data(contentsOf:file))}
+        catch {
+            let backup=cacheDirectory.appendingPathComponent("renewal-history.corrupt-"+UUID().uuidString+".json")
+            do {try FileManager.default.moveItem(at:file,to:backup);renewalRecoveryMessage="Não foi possível ler o histórico anterior; uma cópia foi preservada para recuperação."}
+            catch {renewalHistoryWriteBlocked=true;renewalRecoveryMessage="Não foi possível ler o histórico; o arquivo original foi preservado e a gravação suspensa."}
+        }
+    }
     func refreshRenewalHistory() {
         var changed=false
         for record in detector.state.history+claudeDetector.state.history where !importedRenewalDetections.contains(record.id) {changed=renewalHistory.importDetection(record) || changed;importedRenewalDetections.insert(record.id)}
         for value in [snapshot,claudeSnapshot,zaiSnapshot,kimi.historySnapshot,grok.snapshot].compactMap({$0}) {changed=renewalHistory.ingest(value) || changed}
         renewalHistoryDirty=renewalHistoryDirty || changed
-        if renewalHistoryDirty,let data=try? JSONEncoder().encode(renewalHistory),writePrivate(data,to:cacheDirectory.appendingPathComponent("renewal-history.json")) {renewalHistoryDirty=false}
-        renewalWindow.persistenceMessage=renewalHistoryDirty ? "Não foi possível salvar o histórico; nova tentativa na próxima leitura." : nil
+        if renewalHistoryDirty,!renewalHistoryWriteBlocked,let data=try? JSONEncoder().encode(renewalHistory),writePrivate(data,to:cacheDirectory.appendingPathComponent("renewal-history.json")) {renewalHistoryDirty=false}
+        renewalWindow.persistenceMessage=renewalRecoveryMessage ?? (renewalHistoryDirty ? "Não foi possível salvar o histórico; nova tentativa na próxima leitura." : nil)
         renewalWindow.update(renewalHistory)
     }
     func historyMenu() -> NSMenu {
-        renewalHistory.menu(target:self,action:#selector(showRenewalHistory))
+        let menu=renewalHistory.menu(target:self,action:#selector(showRenewalHistory))
+        if let message=renewalRecoveryMessage {menu.insertItem(info(message),at:1)}
+        return menu
     }
     @objc func showRenewalHistory() {refreshRenewalHistory();renewalWindow.show(renewalHistory)}
     func reconcileCelebration() {

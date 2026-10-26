@@ -57,3 +57,5 @@ Se o Keychain estiver bloqueado ou negar acesso, o monitor preserva a última qu
 `renewal-history.json` guarda os períodos conhecidos, horários de observação e origem das datas no diretório privado do aplicativo. A referência de conta, quando disponível, é o identificador pseudônimo já usado pelo monitor; credenciais e tokens não entram nesse histórico. Não há envio do histórico a um servidor do PlanMeter.
 
 A exportação CSV acontece somente quando o usuário aciona o botão e escolhe o destino. O arquivo contém os registros completos, com datas em ISO 8601, evidência e referência abreviada da conta. Campos de texto são escapados e protegidos contra interpretação como fórmulas em planilhas. Dados de uso reais e CSVs exportados não devem entrar no repositório.
+
+Se o arquivo de histórico não puder ser decodificado, a versão anterior é preservada em um arquivo de recuperação e o aplicativo informa a falha. Se não puder preservar o original, a gravação fica suspensa para evitar sobrescrevê-lo.
