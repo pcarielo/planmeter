@@ -64,13 +64,26 @@ final class AccessSetup: NSObject {
         guard parts.count==2,let provider=providers.first(where:{$0.key==parts[0]}),provider.enabled,provider.actions.contains(parts[1]) else{return}
         onConfigure(key)
     }
+    static func helperCommand(_ path:String)->String {
+        guard path.hasPrefix("/") else{return ""}
+        let quoted="'"+path.replacingOccurrences(of:"'",with:"'\\''")+"'"
+        return "python3 "+quoted+" --apply"
+    }
     static func instruction(for key:String)->(String,String,String) {
         switch key {
         case "codex": return("Instale o Codex CLI oficial e execute este comando no Terminal. Conclua o login com sua conta ChatGPT e depois atualize o PlanMeter.","codex login","https://developers.openai.com/codex/cli/")
-        case "claude": return("Na pasta do projeto PlanMeter, execute o configurador da statusline. Ele faz backup e preserva a configuração existente. A quota se renova com o uso normal do Claude Code.","python3 scripts/configure-claude.py --apply","https://github.com/pcarielo/planmeter/blob/main/docs/getting-started.md#claude-code")
+        case "claude":
+            guard let helper=Bundle.main.url(forResource:"configure-claude",withExtension:"py",subdirectory:"Integration") else {
+                return("O configurador não foi encontrado nesta instalação. Reinstale a versão atual do PlanMeter ou siga o guia oficial.","","https://github.com/pcarielo/planmeter/blob/main/docs/getting-started.md#claude-code")
+            }
+            return("Execute o comando em qualquer pasta do Terminal. O configurador incluído no aplicativo faz backup e preserva sua statusline. Os dados se renovam com o uso normal do Claude Code.",helperCommand(helper.path),"https://github.com/pcarielo/planmeter/blob/main/docs/getting-started.md#claude-code")
         case "grok": return("Instale o Grok Build oficial e execute este comando no Terminal. Conclua o login da assinatura e depois atualize o PlanMeter. Não use uma chave da API para substituir a assinatura.","grok login","https://docs.x.ai/build/overview")
         default: return("A conexão deste provedor é gerenciada no serviço remoto. Ajuste a autenticação pelo fluxo seguro usado naquele host.","","")
         }
+    }
+    static func guideURLResponse(command:String,url:String)->NSApplication.ModalResponse? {
+        guard !url.isEmpty else{return nil}
+        return NSApplication.ModalResponse(rawValue:command.isEmpty ? 1001 : 1002)
     }
     static func guide(_ key:String,measurement:String?=nil) {
         let (detail,command,url)=instruction(for:key)
@@ -81,7 +94,7 @@ final class AccessSetup: NSObject {
         if !url.isEmpty {alert.addButton(withTitle:"Abrir guia oficial")}
         let answer=alert.runModal()
         if answer == .alertSecondButtonReturn && !command.isEmpty {NSPasteboard.general.clearContents();NSPasteboard.general.setString(command,forType:.string)}
-        if answer.rawValue==1002,let link=URL(string:url),!url.isEmpty {NSWorkspace.shared.open(link)}
+        if let expected=guideURLResponse(command:command,url:url),answer==expected,let link=URL(string:url) {NSWorkspace.shared.open(link)}
     }
 }
 
@@ -112,5 +125,18 @@ func runAccessTests() {
     let connected=access.makeContentView().subviews.compactMap {$0 as? NSButton}.first {$0.title=="Conectado"}
     check(connected?.bezelColor == NSColor.systemGreen,"connected action is green")
     check(!view.subviews.compactMap {$0 as? NSTextField}.contains {$0.stringValue=="Sem métrica"},"connection status uses button only")
+    let claude=AccessSetup.instruction(for:"claude")
+    check(claude.1.contains("/Contents/Resources/Integration/configure-claude.py"),"Claude command uses bundled absolute path")
+    check(AccessSetup.helperCommand("scripts/configure-claude.py").isEmpty,"relative helper path is rejected")
+    check(AccessSetup.helperCommand("/fixture/Paulo's App/helper.py").contains("'\\''"),"apostrophes are shell quoted")
+    let path="/fixture/Paulo's App/$title.py"
+    let command=AccessSetup.helperCommand(path)
+    let argument=String(command.dropFirst("python3 ".count).dropLast(" --apply".count))
+    let shell=Process(),output=Pipe();shell.executableURL=URL(fileURLWithPath:"/bin/sh");shell.arguments=["-c","printf '%s' "+argument];shell.standardOutput=output
+    try! shell.run();shell.waitUntilExit()
+    check(shell.terminationStatus==0 && String(data:output.fileHandleForReading.readDataToEndOfFile(),encoding:.utf8)==path,"copied helper path survives shell parsing literally")
+    check(AccessSetup.guideURLResponse(command:"",url:"https://example.invalid")==NSApplication.ModalResponse.alertSecondButtonReturn,"guide button works without a bundled helper")
+    check(AccessSetup.guideURLResponse(command:"fixture",url:"https://example.invalid")==NSApplication.ModalResponse.alertThirdButtonReturn,"guide button follows copy command")
+    check(AccessSetup.guideURLResponse(command:"fixture",url:"")==nil,"no guide action without URL")
     print("PASS access/visibility: \(count) checks; no credentials, clipboard or login")
 }

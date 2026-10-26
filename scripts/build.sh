@@ -14,7 +14,10 @@ import pathlib, plistlib, shutil, sys
 root, app=map(pathlib.Path,sys.argv[1:])
 resources=root/'app/Resources'
 if resources.exists(): shutil.copytree(resources,app/'Contents/Resources',dirs_exist_ok=True)
-info={'CFBundleIdentifier':'io.github.pcarielo.planmeter','CFBundleName':'PlanMeter','CFBundleDisplayName':'PlanMeter','CFBundleExecutable':'PlanMeter','CFBundlePackageType':'APPL','CFBundleShortVersionString':'1.5.1','CFBundleVersion':'10','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSHighResolutionCapable':True}
+integration=app/'Contents/Resources/Integration'; integration.mkdir(parents=True,exist_ok=True)
+for name in ('configure-claude.py','claude-statusline-wrapper.py','claude-statusline-cache.py'):
+    shutil.copy2(root/'scripts'/name,integration/name)
+info={'CFBundleIdentifier' :'io.github.pcarielo.planmeter','CFBundleName':'PlanMeter','CFBundleDisplayName':'PlanMeter','CFBundleExecutable':'PlanMeter','CFBundlePackageType':'APPL','CFBundleShortVersionString':'1.5.2','CFBundleVersion':'11','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSHighResolutionCapable':True}
 if (app/'Contents/Resources/AppIcon.icns').exists(): info['CFBundleIconFile']='AppIcon'
 with (app/'Contents/Info.plist').open('wb') as f: plistlib.dump(info,f)
 PY
