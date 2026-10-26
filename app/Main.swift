@@ -8,6 +8,12 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let dashboard = QuotaDashboard()
     let accessSetup = AccessSetup()
     let settingsWindow=SettingsWindow()
+    let renewalWindow=RenewalHistoryWindow()
+    var renewalHistory=RenewalHistory()
+    private var importedRenewalDetections=Set<String>()
+    private var renewalHistoryDirty=false
+    private var renewalHistoryWriteBlocked=false
+    private var renewalRecoveryMessage:String?
     var interfacePreferences=InterfacePreferences()
     var menu = NSMenu()
     var snapshot: QuotaSnapshot?
@@ -75,6 +81,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let data = try? Data(contentsOf: cacheFile) { snapshot = try? JSONDecoder().decode(QuotaSnapshot.self, from: data) }
         if let data = try? Data(contentsOf: resetFile), let state = try? JSONDecoder().decode(ResetState.self, from: data) { detector.state = state }
         if let data = try? Data(contentsOf: claudeResetFile), let state = try? JSONDecoder().decode(ResetState.self, from: data) { claudeDetector.state = state }
+        loadRenewalHistory()
         if let data = try? Data(contentsOf: preferencesFile), let pref = try? JSONDecoder().decode(CelebrationPreferences.self, from: data) { preferences = pref }
         if let data = try? Data(contentsOf: zaiFile), let cached = try? JSONDecoder().decode(ZaiReading.self, from: data) { zaiReading = cached; zaiSnapshot = cached.snapshot; zaiError = "Cache Z.ai; aguardando leitura" }
         errorText = snapshot == nil ? nil : "Dados em cache; aguardando leitura"
@@ -121,6 +128,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         detector.state.activePending(snapshot: snapshot) + claudeDetector.state.activePending(snapshot: claudeSnapshot)
     }
     func updateUI() {
+        refreshRenewalHistory()
         let badge = demoPending || !realPending.isEmpty ? " 🎉" : ""
         let presentation = StatusPresentation.make(codex: snapshot, claude: claudeSnapshot, zai: zaiSnapshot,
             codexStale: stale(snapshot, error: errorText), claudeStale: stale(claudeSnapshot, error: claudeError),
@@ -260,7 +268,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let usage = NSMenuItem(title: "Claude: abrir Settings → Usage", action: #selector(openClaudeUsage), keyEquivalent: "")
         usage.target = self; menu.addItem(usage)
         menu.addItem(NSMenuItem.separator())
-        let history = NSMenuItem(title: "Histórico de resets detectados", action: nil, keyEquivalent: "")
+        let history = NSMenuItem(title: "Histórico de renovações", action: nil, keyEquivalent: "")
         history.submenu = historyMenu(); menu.addItem(history)
         let ack = NSMenuItem(title: "Dispensar aviso/confete", action: #selector(acknowledge), keyEquivalent: "")
         ack.target = self; ack.isEnabled = demoPending || !realPending.isEmpty; menu.addItem(ack)
@@ -272,35 +280,31 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refresh.target = self; refresh.isEnabled = !policy.busy && !policy.sleeping; menu.addItem(refresh)
         let quit = NSMenuItem(title: "Sair", action: #selector(quitApp), keyEquivalent: "q"); quit.target = self; menu.addItem(quit)
     }
-    func historyMenu() -> NSMenu {
-        let menu = NSMenu()
-        let history = detector.state.history + claudeDetector.state.history
-        guard !history.isEmpty else { menu.addItem(info("Nenhum reset real registrado")); return menu }
-        menu.addItem(info("Intervalos entre detecções, não instantes exatos de reset"))
-        menu.addItem(info("Períodos offline/recovery podem deixar eventos sem registro"))
-        for (key, group) in Dictionary(grouping: history, by: \.groupKey).sorted(by: { $0.key < $1.key }) {
-            let ordered = group.sorted { $0.detectedAt < $1.detectedAt }; let first = ordered[0]
-            let provider = (first.provider ?? "codex") == "claude" ? "Claude" : "Codex"
-            let parent = NSMenuItem(title: "\(provider) · \(first.bucketID) · conta \(first.identityFingerprint.prefix(8)) · \(durationLabel(first.durationMinutes))", action: nil, keyEquivalent: "")
-            let sub = NSMenu(); let intervals = detectionIntervals(ordered)
-            if let last = intervals.last {
-                sub.addItem(info("Último intervalo detectado: \(intervalLabel(last))"))
-                sub.addItem(info("Média (\(intervals.count) intervalos): \(intervalLabel(intervals.reduce(0,+) / Double(intervals.count)))"))
-            } else { sub.addItem(info("Estatística pendente: requer ≥2 eventos reais")) }
-            for (index, record) in ordered.enumerated().reversed() {
-                let row = NSMenuItem(title: "Detectado \(localDate(record.detectedAt))\(record.acknowledgedAt == nil ? " · pendente" : " · reconhecido")", action: nil, keyEquivalent: "")
-                let detail = NSMenu()
-                detail.addItem(info("Próximo reset informado: \(localDate(Date(timeIntervalSince1970: record.serviceResetAt)))"))
-                detail.addItem(info("Reset anterior informado: \(localDate(Date(timeIntervalSince1970: record.previousServiceResetAt)))"))
-                detail.addItem(info("Uso: \(percentLabel(record.previousUsedPercent)) → \(percentLabel(record.usedPercent))"))
-                if index > 0 { detail.addItem(info("Intervalo desde detecção anterior: \(intervalLabel(record.detectedAt.timeIntervalSince(ordered[index-1].detectedAt)))")) }
-                if let ack = record.acknowledgedAt { detail.addItem(info("Reconhecido: \(localDate(ack))")) }
-                row.submenu = detail; sub.addItem(row)
-            }
-            _ = key; parent.submenu = sub; menu.addItem(parent)
+    func loadRenewalHistory() {
+        let file=cacheDirectory.appendingPathComponent("renewal-history.json")
+        guard FileManager.default.fileExists(atPath:file.path) else{return}
+        do {renewalHistory=try JSONDecoder().decode(RenewalHistory.self,from:Data(contentsOf:file))}
+        catch {
+            let backup=cacheDirectory.appendingPathComponent("renewal-history.corrupt-"+UUID().uuidString+".json")
+            do {try FileManager.default.moveItem(at:file,to:backup);renewalRecoveryMessage="Não foi possível ler o histórico anterior; uma cópia foi preservada para recuperação."}
+            catch {renewalHistoryWriteBlocked=true;renewalRecoveryMessage="Não foi possível ler o histórico; o arquivo original foi preservado e a gravação suspensa."}
         }
+    }
+    func refreshRenewalHistory() {
+        var changed=false
+        for record in detector.state.history+claudeDetector.state.history where !importedRenewalDetections.contains(record.id) {changed=renewalHistory.importDetection(record) || changed;importedRenewalDetections.insert(record.id)}
+        for value in [snapshot,claudeSnapshot,zaiSnapshot,kimi.historySnapshot,grok.snapshot].compactMap({$0}) {changed=renewalHistory.ingest(value) || changed}
+        renewalHistoryDirty=renewalHistoryDirty || changed
+        if renewalHistoryDirty,!renewalHistoryWriteBlocked,let data=try? JSONEncoder().encode(renewalHistory),writePrivate(data,to:cacheDirectory.appendingPathComponent("renewal-history.json")) {renewalHistoryDirty=false}
+        renewalWindow.persistenceMessage=renewalRecoveryMessage ?? (renewalHistoryDirty ? "Não foi possível salvar o histórico; nova tentativa na próxima leitura." : nil)
+        renewalWindow.update(renewalHistory)
+    }
+    func historyMenu() -> NSMenu {
+        let menu=renewalHistory.menu(target:self,action:#selector(showRenewalHistory))
+        if let message=renewalRecoveryMessage {menu.insertItem(info(message),at:1)}
         return menu
     }
+    @objc func showRenewalHistory() {refreshRenewalHistory();renewalWindow.show(renewalHistory)}
     func reconcileCelebration() {
         let pending = realPending
         guard !activity.suspended, demoPending || (!pending.isEmpty && journalHealthy) else { confetti.close(); shownKey = nil; return }
@@ -555,7 +559,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if CommandLine.arguments.contains("--loop-self-test") { runLoopTests(); return }
         if CommandLine.arguments.contains("--ui-self-test") {
             guard let i = CommandLine.arguments.firstIndex(of: "--codex"), i+1 < CommandLine.arguments.count else { exit(2) }
-            runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); runQuotaDashboardTests();runResetNoticeTests();runAccessTests();runSettingsTests(); return
+            runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); runQuotaDashboardTests();runResetNoticeTests();runAccessTests();runSettingsTests();runRenewalHistoryUITests(); return
         }
         if CommandLine.arguments.contains("--demo-confetti") || CommandLine.arguments.contains("--demo-confetti-motion") {
             // One request to the running app: no second persistent demo app/process or model call.

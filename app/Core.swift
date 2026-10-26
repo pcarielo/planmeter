@@ -7,6 +7,7 @@ struct QuotaWindow: Codable {
     let remaining: Double?
     let durationMinutes: Int?
     let reset: Double?
+    var startedAt: Double? = nil
 }
 struct QuotaSnapshot: Codable {
     let queriedAt: Date

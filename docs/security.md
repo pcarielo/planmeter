@@ -51,3 +51,11 @@ Quando o sistema exige autorização, o usuário escolhe **Configurações → C
 Builds ad hoc têm identidade vinculada ao conteúdo do executável. Uma atualização pode exigir nova autorização, ainda que o nome do aplicativo seja igual. Para manter a identidade entre versões, o build aceita `PLANMETER_SIGN_IDENTITY` com uma identidade de assinatura válida já configurada no Mac. Isso não cria certificados, não concede confiança a todos os aplicativos e não transforma o build em uma distribuição notarizada. A distribuição padrão continua ad hoc.
 
 Se o Keychain estiver bloqueado ou negar acesso, o monitor preserva a última quota e informa a necessidade de uma ação manual. Ele não pede a senha a cada coleta.
+
+## Histórico de renovações e exportação
+
+`renewal-history.json` guarda os períodos conhecidos, horários de observação e origem das datas no diretório privado do aplicativo. A referência de conta, quando disponível, é o identificador pseudônimo já usado pelo monitor; credenciais e tokens não entram nesse histórico. Não há envio do histórico a um servidor do PlanMeter.
+
+A exportação CSV acontece somente quando o usuário aciona o botão e escolhe o destino. O arquivo contém os registros completos, com datas em ISO 8601, evidência e referência abreviada da conta. Campos de texto são escapados e protegidos contra interpretação como fórmulas em planilhas. Dados de uso reais e CSVs exportados não devem entrar no repositório.
+
+Se o arquivo de histórico não puder ser decodificado, a versão anterior é preservada em um arquivo de recuperação e o aplicativo informa a falha. Se não puder preservar o original, a gravação fica suspensa para evitar sobrescrevê-lo.

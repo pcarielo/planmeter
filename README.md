@@ -20,13 +20,19 @@ Clique no indicador para abrir o painel completo. Só aparecem provedores com pe
 
 Uma falha temporária de consulta pode preservar a última métrica conhecida, marcada como desatualizada. O Kimi só aparece após uma consulta autenticada nesta execução e fica oculto se o acesso à chave falhar. O cache não comprova autenticação.
 
-## Aviso de reset
+## Histórico e avisos de renovação
 
-Quando o histórico permite confirmar uma renovação de quota do Codex ou do Claude com identidade de conta verificável, o aplicativo mostra um aviso com confete. Os demais provedores exibem as datas de reset disponíveis, sem detecção de evento com confete. O alerta permanece até o reconhecimento, por clique nele ou no indicador da barra. Durante bloqueio ou suspensão, ele fica oculto e retorna ao retomar a sessão. O histórico registra a detecção, não um reset executado pelo aplicativo.
+O histórico registra as janelas conhecidas de Codex, Claude, Z.ai, Kimi Code e Grok. Quando o provedor fornece o início do período, a data aparece como informada. Quando fornece apenas a duração e a próxima renovação, o início é inferido por subtração. Janelas sem início nem duração conhecidos não recebem uma data inventada.
+
+Cada registro identifica a origem da data e se uma mudança também foi detectada entre leituras. Uma data inferida representa o início calculado da janela, não a confirmação do instante exato em que o saldo foi reposto. Dados antigos continuam identificados pelo horário em que foram observados.
+
+O menu mostra até **cinco registros por provedor**. Clique em **Histórico…** para abrir a lista completa e use **Exportar CSV…** para escolher onde salvar uma cópia. Releituras do mesmo período não criam novas linhas; uma detecção posterior melhora o registro existente.
+
+Os avisos com confete continuam ligados às renovações confirmadas por comparação de leituras do Codex ou do Claude com identidade verificável. O preenchimento inicial do histórico com janelas inferidas não dispara avisos retroativos.
 
 ![Aviso de reset com evento simulado, sem alteração de quota real](docs/images/reset.png)
 
-As imagens usam dados fictícios. O aviso acima foi capturado na interface real com um evento simulado; nenhum reset ou consumo de modelo foi executado para produzi-lo.
+As imagens usam dados fictícios. O aviso foi capturado na interface real com um evento simulado; nenhum reset ou consumo de modelo foi executado para produzi-lo.
 
 ## Como funciona
 

@@ -15,13 +15,19 @@ struct ResetRecord: Codable {
     var acknowledgedAt: Date?
     var groupKey: String { "\(provider ?? "codex"):\(identityFingerprint):\(bucketID):\(window):\(durationMinutes)" }
 }
+struct ResetTransition: Codable {
+    let previous: QuotaSnapshot
+    let current: QuotaSnapshot
+    let confirmed: Bool
+}
 struct ResetState: Codable {
     var baseline: QuotaSnapshot?
     var recentEventIDs: [String] = []
     var lastDetectedAt: Date?
     var history: [ResetRecord] = []
+    var transitions: [ResetTransition] = []
     init() {}
-    enum CodingKeys: String, CodingKey { case baseline, recentEventIDs, lastDetectedAt, history }
+    enum CodingKeys: String, CodingKey { case baseline, recentEventIDs, lastDetectedAt, history, transitions }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         baseline = try c.decodeIfPresent(QuotaSnapshot.self, forKey: .baseline)
@@ -29,6 +35,7 @@ struct ResetState: Codable {
         lastDetectedAt = try c.decodeIfPresent(Date.self, forKey: .lastDetectedAt)
         // Legacy one-shot events have no factual detail; never fabricate historical records.
         history = try c.decodeIfPresent([ResetRecord].self, forKey: .history) ?? []
+        transitions = Array((try c.decodeIfPresent([ResetTransition].self, forKey:.transitions) ?? []).suffix(32))
     }
     func activePending(snapshot: QuotaSnapshot?) -> [ResetRecord] {
         guard let snapshot = snapshot, let identity = snapshot.identityFingerprint else { return [] }
@@ -46,20 +53,31 @@ struct ResetDetector {
     mutating func interrupt() { armed = false }
     mutating func accept(_ current: QuotaSnapshot) -> [ResetRecord] {
         let previous = state.baseline
-        defer { state.baseline = current; armed = true }
+        var events: [ResetRecord] = []
+        defer {
+            if let prior=previous, let identity=current.identityFingerprint, !identity.isEmpty,
+               prior.identityFingerprint==identity,prior.bucketID==current.bucketID,
+               prior.effectiveProvider==current.effectiveProvider,current.queriedAt>prior.queriedAt,
+               current.windows.contains(where:{ window in
+                   guard let next=window.reset,let old=prior.windows.first(where:{$0.name==window.name})?.reset else{return false}
+                   return next.isFinite && old.isFinite && next>=old+60
+               }) {
+                state.transitions.append(ResetTransition(previous:prior,current:current,confirmed:!events.isEmpty))
+                state.transitions=Array(state.transitions.suffix(32))
+            }
+            state.baseline = current; armed = true
+        }
         guard let prior = previous,
               let identity = current.identityFingerprint, !identity.isEmpty,
               identity == prior.identityFingerprint,
               current.effectiveProvider == prior.effectiveProvider,
               current.bucketID == (current.effectiveProvider == "claude" ? "claude_usage" : "codex"), current.bucketID == prior.bucketID,
               current.queriedAt > prior.queriedAt else { return [] }
-        var events: [ResetRecord] = []
         for window in current.windows {
             guard let old = prior.windows.first(where: { $0.name == window.name }),
                   let duration = window.durationMinutes, duration > 0, duration == old.durationMinutes,
                   let before = old.remaining, let after = window.remaining,
                   before.isFinite, after.isFinite, (0...100).contains(before), (0...100).contains(after),
-                  after - before >= 1,
                   let oldReset = old.reset, let newReset = window.reset,
                   oldReset.isFinite, newReset.isFinite,
                   newReset >= oldReset + 60,
@@ -68,13 +86,18 @@ struct ResetDetector {
                   newReset > current.queriedAt.timeIntervalSince1970 else { continue }
             let seconds = Double(duration) * 60, now = current.queriedAt.timeIntervalSince1970
             let gap = current.queriedAt.timeIntervalSince(prior.queriedAt)
-            // Early/manual resets still need uninterrupted, closely spaced observations.
-            let continuous = armed && gap <= 150 && abs((newReset - now) - seconds) <= 180
+            // Closely spaced observations allow the existing timestamp tolerance.
+            let quotaRecovered = after-before >= 1
+            let continuous = quotaRecovered && armed && gap <= 150 && abs((newReset - now) - seconds) <= 180
             // A scheduled renewal can be confirmed after sleep/restart from the same
-            // account: the old deadline passed, quota recovered, and a full window advanced.
+            // account: the old deadline passed and a full window advanced.
             let scheduled = gap <= seconds && oldReset <= now &&
                 newReset - oldReset >= seconds - 180 && newReset - now <= seconds + 180
-            guard (continuous || scheduled), oldReset - now <= seconds + 180 else { continue }
+            let newWindowStart = newReset-seconds
+            // Codex can also prove a new window after an error or sleep, independent of gap length.
+            let recoveredEarly = current.effectiveProvider == "codex" && quotaRecovered && gap<=seconds &&
+                newWindowStart>=prior.queriedAt.timeIntervalSince1970 && newWindowStart<=now
+            guard (continuous || scheduled || recoveredEarly), oldReset - now <= seconds + 180 else { continue }
             let id = "\(current.effectiveProvider):\(identity):\(current.bucketID!):\(window.name):\(duration):\(Int64(newReset))"
             guard !state.recentEventIDs.contains(id), !state.history.contains(where: { $0.id == id }) else { continue }
             let event = ResetRecord(id: id, provider: current.effectiveProvider, identityFingerprint: identity, bucketID: current.bucketID!, window: window.name,
