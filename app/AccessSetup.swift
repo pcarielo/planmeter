@@ -81,6 +81,10 @@ final class AccessSetup: NSObject {
         default: return("A conexão deste provedor é gerenciada no serviço remoto. Ajuste a autenticação pelo fluxo seguro usado naquele host.","","")
         }
     }
+    static func guideURLResponse(command:String,url:String)->NSApplication.ModalResponse? {
+        guard !url.isEmpty else{return nil}
+        return NSApplication.ModalResponse(rawValue:command.isEmpty ? 1001 : 1002)
+    }
     static func guide(_ key:String,measurement:String?=nil) {
         let (detail,command,url)=instruction(for:key)
         let alert=NSAlert();alert.messageText="Conectar " + key.capitalized
@@ -90,7 +94,7 @@ final class AccessSetup: NSObject {
         if !url.isEmpty {alert.addButton(withTitle:"Abrir guia oficial")}
         let answer=alert.runModal()
         if answer == .alertSecondButtonReturn && !command.isEmpty {NSPasteboard.general.clearContents();NSPasteboard.general.setString(command,forType:.string)}
-        if answer.rawValue==1002,let link=URL(string:url),!url.isEmpty {NSWorkspace.shared.open(link)}
+        if let expected=guideURLResponse(command:command,url:url),answer==expected,let link=URL(string:url) {NSWorkspace.shared.open(link)}
     }
 }
 
@@ -131,5 +135,8 @@ func runAccessTests() {
     let shell=Process(),output=Pipe();shell.executableURL=URL(fileURLWithPath:"/bin/sh");shell.arguments=["-c","printf '%s' "+argument];shell.standardOutput=output
     try! shell.run();shell.waitUntilExit()
     check(shell.terminationStatus==0 && String(data:output.fileHandleForReading.readDataToEndOfFile(),encoding:.utf8)==path,"copied helper path survives shell parsing literally")
+    check(AccessSetup.guideURLResponse(command:"",url:"https://example.invalid")==NSApplication.ModalResponse.alertSecondButtonReturn,"guide button works without a bundled helper")
+    check(AccessSetup.guideURLResponse(command:"fixture",url:"https://example.invalid")==NSApplication.ModalResponse.alertThirdButtonReturn,"guide button follows copy command")
+    check(AccessSetup.guideURLResponse(command:"fixture",url:"")==nil,"no guide action without URL")
     print("PASS access/visibility: \(count) checks; no credentials, clipboard or login")
 }
