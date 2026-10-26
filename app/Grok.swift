@@ -33,6 +33,10 @@ func parseGrok(_ result:[String:Any],now:Date=Date()) throws -> GrokReading {
     let unified=config["isUnifiedBillingUser"] as? Bool
     let label=type=="USAGE_PERIOD_TYPE_WEEKLY" ? "Semanal" : type=="USAGE_PERIOD_TYPE_MONTHLY" ? "Mensal" : "Uso incluído"
     var snapshot=QuotaSnapshot(queriedAt:now,windows:[QuotaWindow(name:label,remaining:100-used,durationMinutes:type=="USAGE_PERIOD_TYPE_WEEKLY" ? 10080 : nil,reset:reset)])
+    if let text=period["start"] as? String,let start=formatter.date(from:text) ?? ISO8601DateFormatter().date(from:text) {
+        var window=snapshot.windows[0];window.startedAt=start.timeIntervalSince1970
+        var updated=QuotaSnapshot(queriedAt:snapshot.queriedAt,windows:[window]);updated.provider=snapshot.provider;updated.bucketID=snapshot.bucketID;snapshot=updated
+    }
     snapshot.provider="grok";snapshot.bucketID=unified == true ? "grok:unified" : unified == false ? "grok:build" : "grok:unknown"
     return GrokReading(snapshot:snapshot,status:"ok",nextAttemptAt:now.addingTimeInterval(60))
 }

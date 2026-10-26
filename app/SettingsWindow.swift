@@ -130,7 +130,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps:true);window?.makeKeyAndOrderFront(nil)
     }
-    func windowWillClose(_ notification:Notification) {NSApp.setActivationPolicy(.accessory)}
+    func windowWillClose(_ notification:Notification) {if let window=window {refreshUtilityActivation(excluding:window)}}
     deinit {if let observer=keyObserver {NotificationCenter.default.removeObserver(observer)}}
 }
 func runSettingsTests() {

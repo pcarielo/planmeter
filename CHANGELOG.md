@@ -1,5 +1,13 @@
 # Alterações
 
+## 1.5.0 - 2026-10-26
+
+- Renovações antecipadas observadas após suspensão podem ser reconhecidas com dados consistentes da mesma conta.
+- Comparações com mudança de data ficam guardadas localmente para diagnóstico, com limite de 32 registros.
+- Histórico preenchido com o início informado ou inferido das janelas conhecidas de cada provedor, com deduplicação e identificação da evidência.
+- Menu limitado aos últimos cinco registros de cada provedor.
+- Janela de histórico completo com exportação CSV e distinção entre conta identificada e fonte sem identidade.
+
 ## 1.4.1 - 2026-10-24
 
 - Reduzir Movimento respeitado por padrão em instalações novas.

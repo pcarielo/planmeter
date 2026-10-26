@@ -24,6 +24,7 @@ final class KimiMonitor: NSObject {
     private(set) var reading: KimiReading?
     private var lastGood: QuotaSnapshot?
     private var authenticatedThisRun = false
+    var historySnapshot:QuotaSnapshot? {lastGood}
     var snapshot: QuotaSnapshot? {
         guard authenticatedThisRun, let cached=lastGood else {return nil}
         var value=QuotaSnapshot(queriedAt:cached.queriedAt,windows:cached.windows.filter {$0.reset.map {$0 > Date().timeIntervalSince1970} ?? true})

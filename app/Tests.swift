@@ -94,6 +94,7 @@ func runUITests(binary: String) {
     check(!app.menu.items.contains(where: { $0.title.contains("2 horas") }), "metrics removed from menu")
     check(app.dashboard.cards.contains{$0.key=="codex" && !$0.windows.isEmpty}, "quota available in dashboard")
     check(app.menu.items.contains(where: { $0.title.contains("DEMO de confete") }), "explicit demo action")
+    check(app.historyMenu().items.filter {$0.representedObject is String}.count==5,"history includes all providers")
     check(countdownLabel(reset:Date().addingTimeInterval(-60).timeIntervalSince1970).contains("aguardando leitura"), "countdown does not claim reset")
     check(FileManager.default.fileExists(atPath: app.cacheFile.path), "cache saved")
     let metrics = try? JSONSerialization.jsonObject(with: Data(contentsOf: app.metricsFile)) as? [String: Any]
@@ -160,10 +161,10 @@ func runResetTests() {
     check(nullPrior.accept(after).isEmpty, "null baseline doesn't celebrate")
     var ancient = ResetDetector(); _ = ancient.accept(snap(0, used: 50, reset: -1000))
     check(ancient.accept(after).isEmpty, "ancient reset timestamp rejected")
-    rejected(snap(400, used: 0, reset: 4000), label: "stale gap")
+    rejected(snap(400, used: 0, reset: 4500), label: "future window start does not prove a reset")
     rejected(snap(-60, used: 0, reset: 3540), label: "clock reversal")
     var recovery = ResetDetector(); _ = recovery.accept(before); recovery.interrupt()
-    check(recovery.accept(after).isEmpty, "error recovery doesn't celebrate")
+    check(recovery.accept(after).count==1, "error recovery detects a proven new Codex window")
     var natural = ResetDetector(); _ = natural.accept(snap(0, used: 99, reset: 30))
     check(natural.accept(after).count == 1, "scheduled window reset")
     check(countdownLabel(reset: start.timeIntervalSince1970 + 3660, now: start) == "Previsto em 1h 1min", "countdown")
@@ -186,8 +187,28 @@ func runResetTests() {
     check(startup.accept(delayed).count == 1, "persisted same-account baseline detects elapsed window")
     rejected(snap(2400, used: 2, reset: 5400, identity: "different"), label: "gap cannot cross account")
     rejected(snap(8000, used: 2, reset: 11400), label: "gap longer than one window rejected")
-    rejected(snap(2400, used: 50, reset: 5400), label: "elapsed reset without recovered quota rejected")
+    var sameBalance=ResetDetector();_ = sameBalance.accept(before)
+    check(sameBalance.accept(snap(2400,used:50,reset:5400)).count==1,"elapsed window can renew with the same balance")
     rejected(snap(2400, used: 2, reset: 3000), label: "short reset shift after gap rejected")
+    var delayedEarly=ResetDetector()
+    _ = delayedEarly.accept(snap(0,used:80,reset:500000,duration:10080));delayedEarly.interrupt()
+    let recoveredEarly=snap(21600,used:5,reset:619200,duration:10080)
+    check(delayedEarly.accept(recoveredEarly).count==1,"early weekly renewal observed after suspension")
+    check(delayedEarly.accept(recoveredEarly).isEmpty,"delayed early renewal deduplicated")
+    check(delayedEarly.state.transitions.count==1 && delayedEarly.state.transitions[0].confirmed,"transition evidence retained without duplicate")
+    let transitionState=try! JSONDecoder().decode(ResetState.self,from:JSONEncoder().encode(delayedEarly.state))
+    check(transitionState.transitions.count==1,"transition evidence survives restart")
+    var oldCycle=ResetDetector();_ = oldCycle.accept(snap(0,used:80,reset:500000,duration:10080));oldCycle.interrupt()
+    check(oldCycle.accept(snap(21600,used:5,reset:601200,duration:10080)).isEmpty,"cycle predating baseline cannot prove a new reset")
+    var noRecovery=ResetDetector();_ = noRecovery.accept(snap(0,used:80,reset:500000,duration:10080));noRecovery.interrupt()
+    check(noRecovery.accept(snap(21600,used:80,reset:619200,duration:10080)).isEmpty,"deadline change alone is not a reset")
+    check(noRecovery.state.transitions.count==1 && !noRecovery.state.transitions[0].confirmed,"unconfirmed changes remain diagnosable")
+    var unused=ResetDetector();_ = unused.accept(snap(0,used:0,reset:30))
+    check(unused.accept(snap(60,used:0,reset:3630)).count==1,"scheduled renewal does not need a balance increase")
+    for gap in [60.0,150,151,240] {
+        var retry=ResetDetector();_ = retry.accept(before);retry.interrupt()
+        check(retry.accept(snap(gap,used:0,reset:gap+3600)).count==1,"proof is independent of retry gap length")
+    }
     print("PASS reset: \(count) checks")
 }
 
@@ -249,6 +270,7 @@ func runHistoryTests() {
     activity.screenLocked = false; activity.displaySleeping = true
     check(activity.suspended, "display sleep pauses")
     activity.displaySleeping = false; check(!activity.suspended, "resume only when all active")
+    runRenewalHistoryTests()
     print("PASS history/ack/providers: \(count) checks")
 }
 func runLoopTests() {
