@@ -129,7 +129,11 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.mainMenu=appMenu
     }
     func stale(_ value: QuotaSnapshot?, error: String? = nil, now: Date = Date()) -> Bool {
-        error != nil || value == nil || now.timeIntervalSince(value!.queriedAt) > (["zai", "kimi", "grok"].contains(value!.effectiveProvider) ? 960 : 120)
+        guard let value=value,error==nil else{return true}
+        // A live passive feed can deliver unchanged values. Its receipt clock
+        // indicates delivery only; the observation clock remains unchanged.
+        let timestamp=value.effectiveProvider=="claude" ? (value.receivedAt ?? value.queriedAt) : value.queriedAt
+        return now.timeIntervalSince(timestamp) > (["zai", "kimi", "grok"].contains(value.effectiveProvider) ? 960 : 120)
     }
     var realPending: [ResetRecord] {
         detector.state.activePending(snapshot: snapshot) + claudeDetector.state.activePending(snapshot: claudeSnapshot)
@@ -158,7 +162,8 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dashboard.onRefresh = { [weak self] in self?.manualRefresh() }
         dashboard.refreshEnabled = !activity.suspended && !policy.busy && !kimi.busy && !grok.busy
         if !dashboard.refreshMessage.isEmpty {
-            dashboard.refreshMessage = (policy.busy || kimi.busy || grok.busy || zaiBusy) ? "Atualizando dados…" : ([zaiRefreshMessage,kimi.message,grok.message].compactMap{$0}.joined(separator:" · "))
+            let claudeMessage=claudeError ?? (claudeSnapshot == nil ? "Claude: aguardando dados do cliente" : "Claude: leitura local concluída")
+            dashboard.refreshMessage = (policy.busy || kimi.busy || grok.busy || zaiBusy) ? "Atualizando dados…" : ([claudeMessage,zaiRefreshMessage,kimi.message,grok.message].compactMap{$0}.joined(separator:" · "))
         }
         dashboard.update()
     }
@@ -352,6 +357,10 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func savePreferences() { if let data = try? JSONEncoder().encode(preferences) { writePrivate(data, to: preferencesFile) } }
     func writeMetrics() {
         let raw: [String:Any] = ["pid":ProcessInfo.processInfo.processIdentifier,"statusItemVisible":status?.isVisible ?? false,
+            "claudeCacheReads":claudeCacheReads,"claudeHasMetrics":StatusPresentation.validRemaining(claudeSnapshot) != nil,
+            "claudeFeedStale":stale(claudeSnapshot,error:claudeError),
+            "claudeReceivedAtUnix":claudeSnapshot?.receivedAt?.timeIntervalSince1970 as Any? ?? NSNull(),
+            "claudeObservationAtUnix":claudeSnapshot?.queriedAt.timeIntervalSince1970 as Any? ?? NSNull(),
             "grokStatus":grok.reading?.status ?? "pending","grokBusy":grok.busy,"grokRequests":grok.requests,"kimiStatus":kimi.reading?.status ?? "pending","kimiBusy":kimi.busy,"kimiRequests":kimi.requests,"zaiManualRequests":zaiManualRequests,"zaiAuthStatus":zaiReading?.status ?? "pending","zaiBusy":zaiBusy,
             "zaiRefreshMessage":zaiRefreshMessage as Any? ?? NSNull(),"zaiReads":zaiReads,
             "failures":policy.failures,"busy":policy.busy,"sleeping":policy.sleeping,

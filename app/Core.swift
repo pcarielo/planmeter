@@ -16,6 +16,8 @@ struct QuotaSnapshot: Codable {
     var bucketID: String? = nil
     var provider: String? = nil
     var sourceHost: String? = nil
+    // Latest delivery from a passive source; not proof of a fresh provider API query.
+    var receivedAt: Date? = nil
     var effectiveProvider: String { provider ?? "codex" }
     var remaining: Double? { windows.compactMap(\.remaining).min() }
 }

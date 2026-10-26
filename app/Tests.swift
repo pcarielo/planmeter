@@ -104,6 +104,28 @@ func runUITests(binary: String) {
     check(app.snapshot?.remaining == 63, "failure preserves cache")
     check(app.status.button!.title.contains("·"), "failure marks stale")
     check(app.policy.failures == 1, "failure backoff")
+    let source=Date().addingTimeInterval(-900),delivery=Date()
+    let payload:[String:Any] = ["source":"claude-code-statusline","providerObservedAt":source.timeIntervalSince1970,"capturedAt":delivery.timeIntervalSince1970,"rateLimits":["five_hour":["used_percentage":20,"resets_at":delivery.addingTimeInterval(3600).timeIntervalSince1970]]]
+    let cache=directory.appendingPathComponent("claude-statusline.json")
+    try! JSONSerialization.data(withJSONObject:payload).write(to:cache)
+    app.readClaudeCache()
+    check(!app.stale(app.claudeSnapshot,error:app.claudeError),"unchanged quota with recent source delivery is an active passive feed")
+    check(abs(app.claudeSnapshot!.queriedAt.timeIntervalSince(source))<0.001,"receipt does not promote the observation clock")
+    check(abs(app.claudeSnapshot!.receivedAt!.timeIntervalSince(delivery))<0.001,"receipt clock is preserved separately")
+    check(app.stale(app.claudeSnapshot,now:delivery.addingTimeInterval(121)),"silent Claude feed is identified after the delivery interval")
+    let passive=QuotaCard(key:"claude",name:"Claude",snapshot:app.claudeSnapshot!,stale:false)
+    check(passive.detail=="Leitura passiva do Claude Code" && abs(passive.deliveryDate.timeIntervalSince(delivery))<0.001,"card explains passive receipt without claiming provider refresh")
+    let tooltip=StatusPresentation.make(codex:nil,claude:app.claudeSnapshot,zai:nil,codexStale:false,claudeStale:false,zaiStale:false,badge:"")
+    check(tooltip.accessibilityText.contains("leitura passiva do Claude Code"),"menu bar explains passive source")
+    check(QuotaCard(key:"claude",name:"Claude",snapshot:app.claudeSnapshot!,stale:true).detail=="Aguardando atualização do Claude Code","silent passive source has an actionable label")
+    var invalid=payload;invalid["capturedAt"]=delivery.addingTimeInterval(3600).timeIntervalSince1970
+    try! JSONSerialization.data(withJSONObject:invalid).write(to:cache)
+    do {_ = try ClaudeCacheProvider(path:cache).read(now:delivery);check(false,"future delivery cannot make data fresh")}
+    catch {check(true,"future delivery rejected")}
+    invalid.removeValue(forKey:"capturedAt")
+    try! JSONSerialization.data(withJSONObject:invalid).write(to:cache)
+    let legacy=try! ClaudeCacheProvider(path:cache).read(now:delivery)
+    check(legacy.receivedAt==nil && app.stale(legacy,now:delivery),"legacy cache is not promoted without a receipt clock")
     let beforeSleep = app.attempts
     app.sleep(); app.refresh()
     check(app.attempts == beforeSleep && app.policy.sleeping, "sleep blocks requests")
