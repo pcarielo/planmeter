@@ -1,5 +1,10 @@
 # Alterações
 
+## 1.5.2 - 2026-10-26
+
+- Configurador do Claude Code incluído no aplicativo, com comando absoluto que funciona em qualquer pasta do Terminal.
+- Caminhos com espaços, apóstrofos e caracteres especiais são copiados com escape para o shell.
+
 ## 1.5.1 - 2026-10-26
 
 - Histórico completo ordenável por qualquer coluna, com alternância de direção e escolha preservada durante atualizações.

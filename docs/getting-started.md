@@ -43,6 +43,8 @@ Preserve outras propriedades já presentes nesse arquivo. Não coloque tokens, s
 
 ## Claude Code
 
+Em **Configurações → Contas → Claude Code**, use **Copiar comando**. O caminho é absoluto e aponta para o configurador incluído no aplicativo; você pode executá-lo de qualquer pasta do Terminal.
+
 O helper requer Python 3. Primeiro, inspecione a configuração:
 
 ```sh

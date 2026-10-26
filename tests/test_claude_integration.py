@@ -47,6 +47,15 @@ class ClaudeIntegrationTests(unittest.TestCase):
         self.assertIsNone(second['identityFingerprint'])
         self.assertEqual(cache.stat().st_mode & 0o777,0o600)
         self.assertFalse((self.home/'provider-called').exists())
+    def test_bundled_setup_works_from_unrelated_directory(self):
+        helper=ROOT/'build/PlanMeter.app/Contents/Resources/Integration/configure-claude.py'
+        self.assertTrue(helper.is_file())
+        unrelated=self.home/'unrelated folder'; unrelated.mkdir()
+        result=subprocess.run(['python3',str(helper),'--apply'],cwd=unrelated,env=self.env,capture_output=True)
+        self.assertEqual(result.returncode,0,result.stderr.decode())
+        configured=json.loads(self.settings.read_text())
+        self.assertIn('claude-statusline-wrapper.py',configured['statusLine']['command'])
+        self.assertFalse((self.home/'provider-called').exists())
     def test_invalid_settings_are_not_overwritten(self):
         self.settings.write_text('{broken'); self.configure('--apply',ok=False); self.assertEqual(self.settings.read_text(),'{broken')
     def test_unsupported_statusline_is_not_overwritten(self):
