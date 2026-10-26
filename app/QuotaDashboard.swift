@@ -11,9 +11,13 @@ struct QuotaCard {
         return window.durationMinutes.map {$0 == 10080 ? "Semanal" : durationLabel($0)} ?? window.name
     }
     var detail:String? {
+        if key=="claude" {
+            return stale ? "Aguardando atualização do Claude Code" : "Leitura passiva do Claude Code"
+        }
         let parts=[stale ? "Dados desatualizados" : nil,note].compactMap {$0}
         return parts.isEmpty ? nil : parts.joined(separator:" · ")
     }
+    var deliveryDate:Date {snapshot.receivedAt ?? snapshot.queriedAt}
     static func available(_ values: [QuotaCard]) -> [QuotaCard] { values.filter { !$0.windows.isEmpty } }
 }
 
@@ -45,7 +49,7 @@ final class QuotaDashboardView: NSView {
             let windows: [String] = card.windows.map { window in
                 QuotaCard.windowLabel(window) + " " + percentLabel(window.remaining)
             }
-            let freshness = card.stale ? ", dados desatualizados" : ""
+            let freshness = card.detail.map {", "+$0} ?? ""
             return card.name + freshness + ": " + windows.joined(separator:", ")
         }
         setAccessibilityLabel("Quotas disponíveis. " + summaries.joined(separator:". "))
@@ -67,7 +71,7 @@ final class QuotaDashboardView: NSView {
                 NSColor.separatorColor.withAlphaComponent(0.35).setStroke();NSBezierPath(roundedRect:rect.insetBy(dx:0.5,dy:0.5),xRadius:12,yRadius:12).stroke()
                 if let icon=StatusPresentation.icons[card.key] { icon.draw(in:NSRect(x:x+14,y:y+14,width:20,height:20),from:.zero,operation:.sourceOver,fraction:1,respectFlipped:true,hints:nil) }
                 text(card.name,NSRect(x:x+42,y:y+14,width:width-54,height:22),15,.labelColor,.semibold)
-                text("Atualizado em " + localDate(card.snapshot.queriedAt),NSRect(x:x+14,y:y+42,width:width-28,height:18),11,.secondaryLabelColor)
+                text("Recebido em " + localDate(card.deliveryDate),NSRect(x:x+14,y:y+42,width:width-28,height:18),11,.secondaryLabelColor)
                 for (index,window) in card.windows.enumerated() {
                     let top=y+76+CGFloat(index)*96, remaining=window.remaining!
                     let label=QuotaCard.windowLabel(window)

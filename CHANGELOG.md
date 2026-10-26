@@ -1,5 +1,11 @@
 # Alterações
 
+## 1.5.3 - 2026-10-26
+
+- Claude distingue a entrega recente da statusline da última mudança de conteúdo, evitando aviso de dado antigo apenas porque a cota não mudou.
+- Painel identifica leitura passiva e espera por atualização do Claude Code, sem tratar releitura de cache como consulta ao provedor.
+- Horário de recebimento e horário de observação permanecem separados no diagnóstico local.
+
 ## 1.5.2 - 2026-10-26
 
 - Configurador do Claude Code incluído no aplicativo, com comando absoluto que funciona em qualquer pasta do Terminal.

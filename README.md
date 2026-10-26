@@ -18,7 +18,7 @@ Clique no indicador para abrir o painel completo. Só aparecem provedores com pe
 - **Configurações** abre uma janela independente com contas, aparência, início automático, avisos e informações do aplicativo.
 - **×** fecha o painel e desativa a fixação. Sem fixar, um clique no conteúdo também o fecha; os controles continuam utilizáveis.
 
-Uma falha temporária de consulta pode preservar a última métrica conhecida, marcada como desatualizada. O Kimi só aparece após uma consulta autenticada nesta execução e fica oculto se o acesso à chave falhar. O cache não comprova autenticação.
+Uma falha temporária de consulta pode preservar a última métrica conhecida, marcada como desatualizada. No Claude, o horário de recebimento identifica a última entrega da statusline. A indicação de leitura passiva não confirma uma consulta nova à API: os valores podem permanecer iguais. Se a fonte parar de entregar dados, o cartão informa que aguarda atualização do Claude Code; Atualizar relê o cache local. O Kimi só aparece após uma consulta autenticada nesta execução e fica oculto se o acesso à chave falhar. O cache não comprova autenticação.
 
 ## Histórico e avisos de renovação
 

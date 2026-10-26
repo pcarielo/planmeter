@@ -54,7 +54,8 @@ struct StatusPresentation {
                 title.append(NSAttributedString(string: name, attributes: attributes))
             }
             title.append(NSAttributedString(string: " " + value + (stale ? " ·" : ""), attributes: attributes))
-            labels.append(name + " " + value + (stale ? " (desatualizado)" : ""))
+            let sourceNote=key=="claude" ? (stale ? " (leitura passiva; aguardando Claude Code)" : " (leitura passiva do Claude Code)") : (stale ? " (desatualizado)" : "")
+            labels.append(name + " " + value + sourceNote)
         }
         title.append(NSAttributedString(string: badge, attributes: attributes))
         return StatusPresentation(title: title, accessibilityText: labels.joined(separator: " | ") + badge)
