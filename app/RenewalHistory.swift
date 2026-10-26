@@ -201,11 +201,12 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
         }
         let field=NSTextField(labelWithString:text);field.font = .systemFont(ofSize:13);field.lineBreakMode = .byTruncatingTail;field.toolTip=text+(value.identity == nil ? " · conta não identificada pela fonte" : "");return field
     }
+    func exportContents()->String {"\u{FEFF}"+history.csv(exportRows:rows)}
     @objc func exportCSV() {
         guard !CommandLine.arguments.contains(where:{$0.hasSuffix("-self-test")}) else{return}
         let panel=NSSavePanel();panel.allowedContentTypes=[.commaSeparatedText];panel.nameFieldStringValue="planmeter-historico.csv"
         guard panel.runModal() == .OK,let url=panel.url else{return}
-        do {try ("\u{FEFF}"+history.csv(exportRows:rows)).write(to:url,atomically:true,encoding:.utf8)}
+        do {try exportContents().write(to:url,atomically:true,encoding:.utf8)}
         catch {let alert=NSAlert();alert.messageText="Não foi possível exportar o histórico";alert.runModal()}
     }
     func windowWillClose(_ notification:Notification) {if let window=window {refreshUtilityActivation(excluding:window)}}
@@ -277,15 +278,17 @@ func runRenewalHistoryTests() {
 func runRenewalHistoryUITests() {
     var history=RenewalHistory()
     for provider in ["zai","claude"] {
-        var snapshot=QuotaSnapshot(queriedAt:Date(),windows:[QuotaWindow(name:"5h",remaining:50,durationMinutes:300,reset:Date().addingTimeInterval(3600).timeIntervalSince1970)])
+        let observed=Date(timeIntervalSince1970:provider=="zai" ? 1800000000 : 1799996400)
+        var snapshot=QuotaSnapshot(queriedAt:observed,windows:[QuotaWindow(name:"5h",remaining:50,durationMinutes:300,reset:observed.addingTimeInterval(3600).timeIntervalSince1970)])
         snapshot.provider=provider;_ = history.ingest(snapshot)
     }
+    guard history.ordered.first?.provider=="zai" else{fatalError("fixture must distinguish chronological from provider sorting")}
     let historyWindow=RenewalHistoryWindow();historyWindow.show(history)
     guard historyWindow.table.tableColumns.allSatisfy({$0.sortDescriptorPrototype != nil}) else{fatalError("all columns must be sortable")}
     historyWindow.table.sortDescriptors=[NSSortDescriptor(key:"provider",ascending:true)]
     historyWindow.tableView(historyWindow.table,sortDescriptorsDidChange:[]);historyWindow.update(history)
     guard historyWindow.rows.first?.provider=="claude" else{fatalError("selected sort survives data refresh")}
-    guard history.csv(exportRows:historyWindow.rows).components(separatedBy:"\r\n")[1].hasPrefix("\"Claude\"") else{fatalError("export follows the displayed ordering")}
+    guard historyWindow.exportContents().components(separatedBy:"\r\n")[1].hasPrefix("\"Claude\"") else{fatalError("export follows the displayed ordering")}
     let settings=SettingsWindow();settings.show();settings.window?.close()
     guard NSApp.activationPolicy() == .regular else{fatalError("history remains reachable after settings closes")}
     settings.show()
