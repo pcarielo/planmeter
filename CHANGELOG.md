@@ -1,5 +1,11 @@
 # Alterações
 
+## 1.5.1 - 2026-10-26
+
+- Histórico completo ordenável por qualquer coluna, com alternância de direção e escolha preservada durante atualizações.
+- CSV exportado na mesma ordem da tabela.
+- Atalho `⌘W` fecha apenas a janela ativa; `⌘Q` continua encerrando o aplicativo.
+
 ## 1.5.0 - 2026-10-26
 
 - Renovações antecipadas observadas após suspensão podem ser reconhecidas com dados consistentes da mesma conta.

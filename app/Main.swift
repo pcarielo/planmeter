@@ -90,10 +90,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dashboard.onOptionsChanged = { [weak self] scale,pinned in
             guard let self=self else{return};self.interfacePreferences.scale=scale;self.interfacePreferences.pinned=pinned;self.saveInterfacePreferences();self.settingsWindow.model.syncInterface(self.interfacePreferences)
         }
-        let appMenu=NSMenu();let root=NSMenuItem();let actions=NSMenu()
-        let settings=NSMenuItem(title:"Configurações…",action:#selector(configureSettings),keyEquivalent:",");settings.target=self;actions.addItem(settings)
-        let quit=NSMenuItem(title:"Sair do PlanMeter",action:#selector(quitApp),keyEquivalent:"q");quit.target=self;actions.addItem(quit)
-        root.submenu=actions;appMenu.addItem(root);NSApp.mainMenu=appMenu
+        configureMainMenu()
         menu.delegate = self
         let center = NSWorkspace.shared.notificationCenter
         observers.append(center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.sleep() })
@@ -120,6 +117,16 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         grok.onChange = { [weak self] in self?.updateUI();self?.writeMetrics() }
         grok.load();grok.setPaused(activity.suspended)
         startClaudeTimer(); startZaiTimer(); updateUI(); writeMetrics(); refresh()
+    }
+    func configureMainMenu() {
+        let appMenu=NSMenu();let root=NSMenuItem();let actions=NSMenu()
+        let settings=NSMenuItem(title:"Configurações…",action:#selector(configureSettings),keyEquivalent:",");settings.target=self;actions.addItem(settings)
+        let quit=NSMenuItem(title:"Sair do PlanMeter",action:#selector(quitApp),keyEquivalent:"q");quit.target=self;actions.addItem(quit)
+        root.submenu=actions;appMenu.addItem(root)
+        let fileMenu=NSMenuItem(title:"Arquivo",action:nil,keyEquivalent:"");let fileActions=NSMenu(title:"Arquivo")
+        let close=NSMenuItem(title:"Fechar janela",action:#selector(NSWindow.performClose(_:)),keyEquivalent:"w")
+        close.target=nil;fileActions.addItem(close);fileMenu.submenu=fileActions;appMenu.addItem(fileMenu)
+        NSApp.mainMenu=appMenu
     }
     func stale(_ value: QuotaSnapshot?, error: String? = nil, now: Date = Date()) -> Bool {
         error != nil || value == nil || now.timeIntervalSince(value!.queriedAt) > (["zai", "kimi", "grok"].contains(value!.effectiveProvider) ? 960 : 120)

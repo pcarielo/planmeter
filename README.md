@@ -26,7 +26,7 @@ O histórico registra as janelas conhecidas de Codex, Claude, Z.ai, Kimi Code e 
 
 Cada registro identifica a origem da data e se uma mudança também foi detectada entre leituras. Uma data inferida representa o início calculado da janela, não a confirmação do instante exato em que o saldo foi reposto. Dados antigos continuam identificados pelo horário em que foram observados.
 
-O menu mostra até **cinco registros por provedor**. Clique em **Histórico…** para abrir a lista completa e use **Exportar CSV…** para escolher onde salvar uma cópia. Releituras do mesmo período não criam novas linhas; uma detecção posterior melhora o registro existente.
+O menu mostra até **cinco registros por provedor**. Clique em **Histórico…** para abrir a lista completa e use **Exportar CSV…** para escolher onde salvar uma cópia. Clique no cabeçalho de qualquer coluna para ordenar e clique novamente para inverter a direção; o CSV segue a ordem da tabela. `⌘W` fecha apenas a janela ativa e `⌘Q` encerra o aplicativo. Releituras do mesmo período não criam novas linhas; uma detecção posterior melhora o registro existente.
 
 Os avisos com confete continuam ligados às renovações confirmadas por comparação de leituras do Codex ou do Claude com identidade verificável. O preenchimento inicial do histórico com janelas inferidas não dispara avisos retroativos.
 

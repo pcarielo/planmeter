@@ -96,10 +96,10 @@ struct RenewalHistory: Codable {
         let safe=first.map {"=+-@".contains($0)} == true ? "'"+value : value
         return "\""+safe.replacingOccurrences(of:"\"",with:"\"\"")+"\""
     }
-    func csv()->String {
+    func csv(exportRows:[RenewalEntry]?=nil)->String {
         let date=ISO8601DateFormatter()
         let header=["Provedor","Janela","Início da janela","Próxima renovação","Base do registro","Observado em","Conta identificada","Referência da conta"]
-        let rows=ordered.map {row in [row.providerName,row.window,date.string(from:Date(timeIntervalSince1970:row.startedAt)),date.string(from:Date(timeIntervalSince1970:row.endsAt)),row.evidence,date.string(from:row.recordedAt),row.identity == nil ? "Não" : "Sim",row.scopeLabel]}
+        let rows=(exportRows ?? ordered).map {row in [row.providerName,row.window,date.string(from:Date(timeIntervalSince1970:row.startedAt)),date.string(from:Date(timeIntervalSince1970:row.endsAt)),row.evidence,date.string(from:row.recordedAt),row.identity == nil ? "Não" : "Sim",row.scopeLabel]}
         return ([header]+rows).map {$0.map(Self.csvCell).joined(separator:",")}.joined(separator:"\r\n")+"\r\n"
     }
     func menu(target:AnyObject,action:Selector)->NSMenu {
@@ -135,9 +135,9 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
     var history=RenewalHistory()
     var persistenceMessage:String?
     private var summary:NSTextField?
-    private var rows:[RenewalEntry]=[]
+    private(set) var rows:[RenewalEntry]=[]
     let columns=[("provider","Provedor",110.0),("window","Janela",110),("start","Início da janela",180),("end","Próxima renovação",180),("basis","Base do registro",280),("observed","Observado em",180),("scope","Conta",160)]
-    func update(_ value:RenewalHistory) {history=value;rows=history.ordered;table.reloadData();summary?.stringValue=persistenceMessage ?? "\(history.entries.count) registros · datas inferidas não confirmam o instante exato do reset."}
+    func update(_ value:RenewalHistory) {history=value;sortRows();summary?.stringValue=persistenceMessage ?? "\(history.entries.count) registros · datas inferidas não confirmam o instante exato do reset."}
     func show(_ value:RenewalHistory) {
         if window==nil {
             let width=min(1100,NSScreen.main?.visibleFrame.width ?? 1100)-40
@@ -147,7 +147,8 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
             let title=NSTextField(labelWithString:"Histórico completo");title.font = .systemFont(ofSize:21,weight:.semibold);title.frame=NSRect(x:20,y:554,width:400,height:28);title.autoresizingMask=[.minYMargin];content.addSubview(title)
             let note=NSTextField(labelWithString:"");note.font = .systemFont(ofSize:13);note.textColor = .secondaryLabelColor;note.frame=NSRect(x:20,y:528,width:width-200,height:22);note.autoresizingMask=[.width,.minYMargin];content.addSubview(note);summary=note
             let export=NSButton(title:"Exportar CSV…",target:self,action:#selector(exportCSV));export.bezelStyle = .rounded;export.frame=NSRect(x:width-170,y:550,width:150,height:30);export.autoresizingMask=[.minXMargin,.minYMargin];content.addSubview(export)
-            for (key,title,width) in columns {let col=NSTableColumn(identifier:NSUserInterfaceItemIdentifier(key));col.title=title;col.width=width;table.addTableColumn(col)}
+            for (key,title,width) in columns {let col=NSTableColumn(identifier:NSUserInterfaceItemIdentifier(key));col.title=title;col.width=width;col.sortDescriptorPrototype=NSSortDescriptor(key:key,ascending:!["start","end","observed"].contains(key));table.addTableColumn(col)}
+            table.sortDescriptors=[NSSortDescriptor(key:"start",ascending:false)]
             table.delegate=self;table.dataSource=self;table.rowHeight=30;table.usesAlternatingRowBackgroundColors=true;table.allowsMultipleSelection=true
             table.setAccessibilityLabel("Histórico completo de renovações")
             let scroll=NSScrollView(frame:NSRect(x:20,y:20,width:width-40,height:496));scroll.autoresizingMask=[.width,.height];scroll.hasVerticalScroller=true;scroll.hasHorizontalScroller=true;scroll.documentView=table;content.addSubview(scroll)
@@ -155,6 +156,35 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
         }
         update(value);NSApp.setActivationPolicy(.regular);NSApp.activate(ignoringOtherApps:true);window?.makeKeyAndOrderFront(nil)
     }
+    static func sorted(_ values:[RenewalEntry],by descriptors:[NSSortDescriptor])->[RenewalEntry] {
+        func compare(_ a:RenewalEntry,_ b:RenewalEntry,key:String)->ComparisonResult {
+            func number(_ a:Double,_ b:Double)->ComparisonResult {a<b ? .orderedAscending : a>b ? .orderedDescending : .orderedSame}
+            switch key {
+            case "start":return number(a.startedAt,b.startedAt)
+            case "end":return number(a.endsAt,b.endsAt)
+            case "observed":return number(a.recordedAt.timeIntervalSince1970,b.recordedAt.timeIntervalSince1970)
+            case "provider":return a.providerName.localizedStandardCompare(b.providerName)
+            case "window":return a.window.localizedStandardCompare(b.window)
+            case "basis":return a.evidence.localizedStandardCompare(b.evidence)
+            case "scope":return a.scopeLabel.localizedStandardCompare(b.scopeLabel)
+            default:return .orderedSame
+            }
+        }
+        return values.sorted {a,b in
+            for descriptor in descriptors {
+                let comparison=compare(a,b,key:descriptor.key ?? "")
+                if comparison != .orderedSame {return descriptor.ascending ? comparison == .orderedAscending : comparison == .orderedDescending}
+            }
+            return a.startedAt == b.startedAt ? a.id<b.id : a.startedAt>b.startedAt
+        }
+    }
+    private func sortRows() {
+        let selected=Set(table.selectedRowIndexes.compactMap {rows.indices.contains($0) ? rows[$0].id : nil})
+        rows=Self.sorted(history.entries,by:table.sortDescriptors)
+        table.reloadData()
+        table.selectRowIndexes(IndexSet(rows.indices.filter {selected.contains(rows[$0].id)}),byExtendingSelection:false)
+    }
+    func tableView(_ tableView:NSTableView,sortDescriptorsDidChange oldDescriptors:[NSSortDescriptor]) {sortRows()}
     func numberOfRows(in tableView:NSTableView)->Int {history.entries.count}
     func tableView(_ tableView:NSTableView,viewFor tableColumn:NSTableColumn?,row:Int)->NSView? {
         guard rows.indices.contains(row) else{return nil}
@@ -171,11 +201,12 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
         }
         let field=NSTextField(labelWithString:text);field.font = .systemFont(ofSize:13);field.lineBreakMode = .byTruncatingTail;field.toolTip=text+(value.identity == nil ? " · conta não identificada pela fonte" : "");return field
     }
+    func exportContents()->String {"\u{FEFF}"+history.csv(exportRows:rows)}
     @objc func exportCSV() {
         guard !CommandLine.arguments.contains(where:{$0.hasSuffix("-self-test")}) else{return}
         let panel=NSSavePanel();panel.allowedContentTypes=[.commaSeparatedText];panel.nameFieldStringValue="planmeter-historico.csv"
         guard panel.runModal() == .OK,let url=panel.url else{return}
-        do {try ("\u{FEFF}"+history.csv()).write(to:url,atomically:true,encoding:.utf8)}
+        do {try exportContents().write(to:url,atomically:true,encoding:.utf8)}
         catch {let alert=NSAlert();alert.messageText="Não foi possível exportar o histórico";alert.runModal()}
     }
     func windowWillClose(_ notification:Notification) {if let window=window {refreshUtilityActivation(excluding:window)}}
@@ -231,14 +262,50 @@ func runRenewalHistoryTests() {
     var legacy=try! JSONSerialization.jsonObject(with:JSONEncoder().encode(knownEntry(history))) as! [String:Any]
     for key in ["id","startReported","detectedBetweenReadings","inferenceAdjusted"] {legacy.removeValue(forKey:key)}
     check((try? JSONDecoder().decode(RenewalEntry.self,from:JSONSerialization.data(withJSONObject:legacy))) != nil,"optional metadata does not invalidate an old entry")
+    for key in ["provider","window","start","end","basis","observed","scope"] {
+        var low=history.entries[0],high=history.entries[0]
+        low.id="a";high.id="b";low.provider="claude";high.provider="zai";low.window="5 horas";high.window="Semanal"
+        low.startedAt=1700000000;high.startedAt=1800000000;low.endsAt=1700010000;high.endsAt=1800010000
+        low.recordedAt=Date(timeIntervalSince1970:1700000000);high.recordedAt=now
+        low.identity="a";high.identity="z";low.startReported=false;high.startReported=true
+        low.detectedBetweenReadings=false;high.detectedBetweenReadings=false;low.inferenceAdjusted=false;high.inferenceAdjusted=false
+        let ascending=RenewalHistoryWindow.sorted([high,low],by:[NSSortDescriptor(key:key,ascending:true)])
+        let descending=RenewalHistoryWindow.sorted([low,high],by:[NSSortDescriptor(key:key,ascending:false)])
+        check(ascending.first?.id=="a" && descending.first?.id=="b","ascending and descending column "+key)
+    }
     print("PASS renewal history: \(count) checks; fixtures only")
 }
 func runRenewalHistoryUITests() {
-    let history=RenewalHistory();let historyWindow=RenewalHistoryWindow();historyWindow.show(history)
-    let settings=SettingsWindow();settings.show()
-    settings.window?.close()
+    var history=RenewalHistory()
+    for provider in ["zai","claude"] {
+        let observed=Date(timeIntervalSince1970:provider=="zai" ? 1800000000 : 1799996400)
+        var snapshot=QuotaSnapshot(queriedAt:observed,windows:[QuotaWindow(name:"5h",remaining:50,durationMinutes:300,reset:observed.addingTimeInterval(3600).timeIntervalSince1970)])
+        snapshot.provider=provider;_ = history.ingest(snapshot)
+    }
+    guard history.ordered.first?.provider=="zai" else{fatalError("fixture must distinguish chronological from provider sorting")}
+    let historyWindow=RenewalHistoryWindow();historyWindow.show(history)
+    guard historyWindow.table.tableColumns.allSatisfy({$0.sortDescriptorPrototype != nil}) else{fatalError("all columns must be sortable")}
+    historyWindow.table.sortDescriptors=[NSSortDescriptor(key:"provider",ascending:true)]
+    historyWindow.tableView(historyWindow.table,sortDescriptorsDidChange:[]);historyWindow.update(history)
+    guard historyWindow.rows.first?.provider=="claude" else{fatalError("selected sort survives data refresh")}
+    guard historyWindow.exportContents().components(separatedBy:"\r\n")[1].hasPrefix("\"Claude\"") else{fatalError("export follows the displayed ordering")}
+    let settings=SettingsWindow();settings.show();settings.window?.close()
     guard NSApp.activationPolicy() == .regular else{fatalError("history remains reachable after settings closes")}
-    historyWindow.window?.close()
+    settings.show()
+    let menuApp=MenuApp();menuApp.configureMainMenu()
+    historyWindow.window?.makeKeyAndOrderFront(nil);historyWindow.window?.makeKey();NSApp.mainMenu?.update()
+    let close=NSApp.mainMenu?.items.first(where:{$0.title=="Arquivo"})?.submenu?.items.first
+    guard close?.keyEquivalent=="w",close?.target==nil else{fatalError("close shortcut must use the responder chain")}
+    let event=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.command,timestamp:0,windowNumber:historyWindow.window!.windowNumber,context:nil,characters:"w",charactersIgnoringModifiers:"w",isARepeat:false,keyCode:13)!
+    // Isolated/background test runners may have no system key window.
+    // In that case verify the menu's native action against the intended window.
+    let handled:Bool
+    if NSApp.keyWindow === historyWindow.window {handled=NSApp.mainMenu?.performKeyEquivalent(with:event) ?? false}
+    else {handled=NSApp.sendAction(close!.action!,to:historyWindow.window,from:close)}
+    guard handled,historyWindow.window?.isVisible==false,settings.window?.isVisible==true else{fatalError("configured close action closes only the history window")}
+    let quit=NSApp.mainMenu?.items.first?.submenu?.items.first(where:{$0.keyEquivalent=="q"})
+    guard quit?.action == #selector(MenuApp.quitApp) else{fatalError("Command-Q still targets application termination")}
+    settings.window?.close()
     guard NSApp.activationPolicy() == .accessory else{fatalError("last utility window restores menu bar mode")}
     let directory=FileManager.default.temporaryDirectory.appendingPathComponent("history-corrupt-"+UUID().uuidString)
     try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
