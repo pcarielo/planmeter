@@ -46,6 +46,14 @@ func runTests() {
     }
     policy.finish(success: true)
     check(policy.interval == 60, "success restores cadence")
+    policy.baseInterval=300
+    check(policy.interval==300,"configured cadence applies")
+    policy.finish(success:false);policy.finish(success:false)
+    check(policy.interval==600,"configured cadence retains failure backoff")
+    policy.baseInterval=3600;policy.finish(success:true)
+    check(policy.interval==3600,"long configured interval is not shortened by backoff ceiling")
+    policy.baseInterval=60
+
     policy.sleeping = true
     check(!policy.begin(), "no query while asleep")
     policy.sleeping = false
@@ -67,6 +75,9 @@ func runTests() {
 
 import AppKit
 func runUITests(binary: String) {
+    let catalog=AppServerClient(binary:binary,purpose:.models)
+    guard (try! catalog.readModels()) == ["fixture-model"],catalog.quotaRequests==0 else{fatalError("FAIL catalog: metadata-only RPC contract")}
+
     _ = NSApplication.shared
     let app = MenuApp();
     let directory = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("planmeter-tests-" + UUID().uuidString)
@@ -126,6 +137,10 @@ func runUITests(binary: String) {
     try! JSONSerialization.data(withJSONObject:invalid).write(to:cache)
     let legacy=try! ClaudeCacheProvider(path:cache).read(now:delivery)
     check(legacy.receivedAt==nil && app.stale(legacy,now:delivery),"legacy cache is not promoted without a receipt clock")
+    var activeCLI=QuotaSnapshot(queriedAt:delivery,windows:legacy.windows);activeCLI.provider="claude";activeCLI.sourceHost="claude-code-cli"
+    check(!app.stale(activeCLI,now:delivery.addingTimeInterval(180)),"official active Claude uses configured collection interval")
+    check(app.stale(activeCLI,now:delivery.addingTimeInterval(961)),"official active Claude expires after collection interval and grace")
+
     let beforeSleep = app.attempts
     app.sleep(); app.refresh()
     check(app.attempts == beforeSleep && app.policy.sleeping, "sleep blocks requests")
@@ -372,6 +387,19 @@ func runZaiRefreshTests() {
     app.zaiManualCooldown = .distantPast;app.zaiCooldown = .distantPast
     app.startZaiTimer();check(calls==before,"resume does not bypass automatic interval")
     check(Runtime.codexPath()=="/nonexistent/planmeter-test-codex","tests skip personal config")
+    let deadline=Date().addingTimeInterval(500)
+    app.zaiManualCooldown=deadline;app.zaiAutomaticAfter=Date().addingTimeInterval(900)
+    app.kimi.cacheDirectory=directory;app.grok.cacheDirectory=directory
+    app.kimi.schedule.manual=deadline;app.kimi.schedule.automatic=Date().addingTimeInterval(900)
+    app.grok.schedule.manual=deadline;app.grok.schedule.automatic=Date().addingTimeInterval(900)
+    var options=OperationsSettings();options.refreshSeconds=60
+    app.applyOperations(options)
+    check(app.policy.baseInterval==60 && app.kimi.automaticInterval==60 && app.grok.automaticInterval==60,"interval applied to providers")
+    check(app.zaiAutomaticAfter>=deadline && app.kimi.schedule.automatic>=deadline && app.grok.schedule.automatic>=deadline,"interval change preserves provider cooldown")
+    let oldTimer=app.claudeTimer
+    options.queries=false;app.applyOperations(options)
+    check(app.claudeTimer===oldTimer,"logging preference does not restart collection timer")
+    app.claudeTimer?.invalidate();app.timer?.invalidate()
     print("PASS local Z.ai refresh: \(count) checks; fixture transport only")
 }
 

@@ -2,7 +2,8 @@ import Foundation
 
 enum Runtime {
     static let identifier = "io.github.pcarielo.planmeter"
-    static var isTest: Bool { CommandLine.arguments.contains { $0.hasSuffix("-self-test") } }
+    static let testModes:Set<String>=["--self-test","--ui-self-test","--confetti-self-test","--loop-self-test"]
+    static var isTest: Bool { CommandLine.arguments.contains { testModes.contains($0) } }
     static var stateDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/PlanMeter", isDirectory: true)
     }

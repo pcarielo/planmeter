@@ -29,7 +29,7 @@ final class KimiMonitor: NSObject {
         guard authenticatedThisRun, let cached=lastGood else {return nil}
         var value=QuotaSnapshot(queriedAt:cached.queriedAt,windows:cached.windows.filter {$0.reset.map {$0 > Date().timeIntervalSince1970} ?? true})
         value.provider=cached.provider;value.bucketID=cached.bucketID
-        value.identityFingerprint=cached.identityFingerprint;value.sourceHost=cached.sourceHost
+        value.identityFingerprint=cached.identityFingerprint;value.sourceHost=cached.sourceHost;value.credentialScope=cached.credentialScope
         return value.windows.isEmpty ? nil : value
     }
     private(set) var busy = false
@@ -37,12 +37,19 @@ final class KimiMonitor: NSObject {
     private(set) var message: String?
     private(set) var paused = false
     var schedule = KimiSchedule(manual:.distantPast,automatic:.distantPast)
+    var automaticInterval:TimeInterval=900
+    func setRefreshInterval(_ value:TimeInterval) {
+        let previous=automaticInterval;automaticInterval=value
+        schedule.automatic=max(schedule.manual,schedule.automatic.addingTimeInterval(value-previous))
+        save(schedule,to:scheduleFile)
+    }
+    var audit:(AuditAction,AuditOutcome)->Void={_,_ in}
     private var timer: Timer?, client: KimiClient?, generation = 0
     var errorText: String? {
         guard let reading = reading else { return kimiStatus("auth_unavailable") }
         return reading.status == "ok" ? nil : kimiStatus(reading.status)
     }
-    var stale: Bool { errorText != nil || snapshot == nil || Date().timeIntervalSince(snapshot!.queriedAt) > 960 }
+    var stale: Bool { errorText != nil || snapshot == nil || Date().timeIntervalSince(snapshot!.queriedAt) > automaticInterval+60 }
     private var cacheFile: URL { cacheDirectory.appendingPathComponent("kimi-quota.json") }
     private var scheduleFile: URL { cacheDirectory.appendingPathComponent("kimi-schedule.json") }
     @discardableResult private func save<T:Encodable>(_ value: T, to path: URL) -> Bool {
@@ -88,16 +95,17 @@ final class KimiMonitor: NSObject {
             return
         }
         guard manual || now >= schedule.automatic else {return}
-        schedule=KimiSchedule(manual:now.addingTimeInterval(60),automatic:now.addingTimeInterval(900))
+        schedule=KimiSchedule(manual:now.addingTimeInterval(60),automatic:now.addingTimeInterval(automaticInterval))
         guard save(schedule,to:scheduleFile) else { onChange();return }
         busy=true;requests += 1;generation += 1;let token=generation
         message="Kimi: consultando quota…"
-        let request=clientFactory();client=request;onChange()
+        let request=clientFactory();client=request;audit(.query,.started);onChange()
         DispatchQueue.global(qos:.utility).async {
             let result=Result {try request.read()}
             DispatchQueue.main.async { [weak self] in
                 guard let self=self,self.generation==token else {return}
                 self.busy=false;self.client=nil
+                self.audit(.query,(try? result.get()).map{$0.status == "ok"} == true ? .success : .failure)
                 switch result {
                 case .success(let value):
                     self.reading=value
@@ -123,12 +131,12 @@ final class KimiMonitor: NSObject {
         save(schedule,to:scheduleFile)
     }
     @objc func authorizeAccess() {
-        guard !KimiEnvironment.isTest,!busy else{return}
-        if KimiKeychain.authorize() {prepareAfterAuthorization();message="Kimi: acesso autorizado nesta execução";onChange();refreshNow()}
-        else {authenticatedThisRun=false;message="Kimi: acesso não autorizado. Use Configurações → Contas para tentar novamente.";onChange();showFeedback(message!)}
+        guard enabled,!KimiEnvironment.isTest,!busy else{return}
+        if KimiKeychain.authorize() {audit(.authorize,.success);prepareAfterAuthorization();message="Kimi: acesso autorizado nesta execução";onChange();refreshNow()}
+        else {audit(.authorize,.failure);authenticatedThisRun=false;message="Kimi: acesso não autorizado. Use Configurações → Contas para tentar novamente.";onChange();showFeedback(message!)}
     }
     @objc func configure() {
-        guard !KimiEnvironment.isTest,!busy else {return}
+        guard enabled,!KimiEnvironment.isTest,!busy else {return}
         let alert=NSAlert();alert.messageText="Chave do Kimi Code / Coding Plan"
         alert.informativeText="Use a chave emitida no console Kimi Code. Ela ficará no Keychain deste Mac e será usada somente para consultar quotas. O OAuth de outros aplicativos não será alterado."
         let field=KimiCredentialField(frame:NSRect(x:0,y:0,width:360,height:24));alert.accessoryView=field
@@ -139,8 +147,9 @@ final class KimiMonitor: NSObject {
         NSApp.activate(ignoringOtherApps:true)
         defer {field.stringValue=""}
         guard alert.runModal() == .alertFirstButtonReturn else{return}
-        do {try KimiKeychain.save(field.stringValue.trimmingCharacters(in:.whitespacesAndNewlines));clear();refreshNow()}
+        do {try KimiKeychain.save(field.stringValue.trimmingCharacters(in:.whitespacesAndNewlines));audit(.saveKey,.success);clear();refreshNow()}
         catch {
+            audit(.saveKey,.failure)
             message=field.stringValue.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
                 ? "Kimi: o campo está vazio. Nenhuma chave foi salva."
                 : "Kimi: confira se a chave é válida e se o Keychain permite salvá-la"
@@ -158,8 +167,8 @@ final class KimiMonitor: NSObject {
         alert.informativeText="Isso remove apenas o item deste aplicativo no Keychain. Não revoga a chave no provedor nem altera o OAuth."
         alert.addButton(withTitle:"Cancelar");alert.addButton(withTitle:"Remover")
         guard alert.runModal() == .alertSecondButtonReturn else{return}
-        do {try KimiKeychain.remove();clear();message="Kimi: chave removida deste monitor";onChange()}
-        catch {message="Kimi: não foi possível remover a chave";onChange()}
+        do {try KimiKeychain.remove();audit(.removeKey,.success);clear();message="Kimi: chave removida deste monitor";onChange()}
+        catch {audit(.removeKey,.failure);message="Kimi: não foi possível remover a chave";onChange()}
     }
     func clear() {
         client?.cancel();client=nil;busy=false

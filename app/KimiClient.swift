@@ -25,7 +25,10 @@ final class KimiClient: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate
         do {
             let (data,code,retry) = try transport?(key) ?? request(key)
             switch code {
-            case 200: return try parseKimi(data,now:now)
+            case 200:
+                let reading=try parseKimi(data,now:now);var snapshot=reading.snapshot
+                snapshot.credentialScope=quotaCredentialScope(provider:"kimi",key:key)
+                return KimiReading(snapshot:snapshot,status:reading.status,nextAttemptAt:reading.nextAttemptAt)
             case 401,403: return status("unauthorized")
             case 429:
                 let formatter = DateFormatter();formatter.locale = Locale(identifier:"en_US_POSIX");formatter.timeZone = TimeZone(secondsFromGMT:0);formatter.dateFormat = "EEE',' dd MMM yyyy HH':'mm':'ss z"

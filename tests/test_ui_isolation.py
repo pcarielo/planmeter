@@ -24,6 +24,9 @@ class IsolationTests(unittest.TestCase):
             subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', str(app)], check=True, capture_output=True)
             try:
                 subprocess.run(['/usr/bin/defaults', 'write', domain, KEY, '-bool', 'true'], check=True)
+                result = subprocess.run([str(app / 'Contents/MacOS/PlanMeter'), '--x-self-test'], capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn('desconhecido', result.stderr)
                 for mode in ('ui', 'confetti', 'loop'):
                     with self.subTest(mode=mode):
                         result = subprocess.run([str(app / 'Contents/MacOS/PlanMeter'), '--' + mode + '-self-test', '--codex', str(ROOT / 'fake-codex.py')], capture_output=True, text=True, timeout=30)

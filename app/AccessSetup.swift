@@ -3,6 +3,8 @@ import AppKit
 struct ProviderAccess: Equatable {
     let key:String, name:String, status:String, detail:String, actionTitle:String
     var connected=false
+    var selected=true
+    var selectionEnabled=true
     var enabled=true
     var actions:[String]=[]
 }
@@ -20,6 +22,14 @@ final class ConnectionButton: NSButton {
 final class AccessSetup: NSObject {
     private(set) var panel:NSPanel?
     var providers:[ProviderAccess]=[]
+    var summary="Sem métrica, o provedor fica oculto na barra e no painel."
+    var onSelect:(String,Bool)->Void={_,_ in}
+    var onUpgrade:()->Void={}
+    @objc func upgrade(){onUpgrade()}
+    @objc func togglePlan(_ sender:NSButton) {
+        guard providers.indices.contains(sender.tag),providers[sender.tag].selectionEnabled else{return}
+        onSelect(providers[sender.tag].key,sender.state == .on)
+    }
     var onConfigure:(String)->Void = {_ in}
     func show() {
         panel?.close()
@@ -35,19 +45,22 @@ final class AccessSetup: NSObject {
             let label=NSTextField(wrappingLabelWithString:text);label.frame=frame;label.font = .systemFont(ofSize:size,weight:bold ? .semibold : .regular);view.addSubview(label);return label
         }
         _=label("Conecte os serviços que você usa",NSRect(x:22,y:height-48,width:width-44,height:26),21,true)
-        _=label("Sem métrica, o provedor fica oculto na barra e no painel.",NSRect(x:22,y:height-73,width:width-44,height:20),13)
+        _=label(summary,NSRect(x:22,y:height-90,width:width-158,height:40),13)
+        let upgrade=NSButton(title:"Sobre o Pro",target:self,action:#selector(upgrade));upgrade.bezelStyle = .rounded;upgrade.frame=NSRect(x:width-130,y:height-82,width:108,height:28);view.addSubview(upgrade)
         for (index,provider) in providers.enumerated() {
             let y=height-163-CGFloat(index)*87
-            _=label(provider.name,NSRect(x:22,y:y+49,width:180,height:23),16,true)
+            let toggle=NSButton(checkboxWithTitle:"",target:self,action:#selector(togglePlan(_:)))
+            toggle.tag=index;toggle.state=provider.selected ? .on : .off;toggle.isEnabled=provider.selectionEnabled;toggle.frame=NSRect(x:22,y:y+49,width:22,height:23);toggle.setAccessibilityLabel("Monitorar "+provider.name);view.addSubview(toggle)
+            _=label(provider.name,NSRect(x:48,y:y+49,width:180,height:23),16,true)
             _=label(provider.detail,NSRect(x:22,y:y+4,width:width-(provider.actions.isEmpty ? 188 : 230),height:43),13)
             let action=ConnectionButton(title:provider.connected ? "Conectado" : "Conectar",target:self,action:#selector(configure(_:)));action.connected=provider.connected;action.tag=index;action.isEnabled=provider.enabled;action.bezelStyle = .rounded;action.font = .systemFont(ofSize:14,weight:.medium);action.bezelColor=provider.connected ? .systemGreen : .systemGray;action.contentTintColor = .white;action.setAccessibilityLabel(provider.name + (provider.connected ? ", conectado" : ", conectar"));action.frame=NSRect(x:width-(provider.actions.isEmpty ? 152 : 194),y:y+39,width:128,height:30);view.addSubview(action)
             if !provider.actions.isEmpty {
                 let more=NSPopUpButton(frame:NSRect(x:width-54,y:y+39,width:32,height:30),pullsDown:true)
-                more.addItem(withTitle:"•••");more.isEnabled=provider.enabled
+                more.menu?.autoenablesItems=false;more.addItem(withTitle:"•••");more.isEnabled=provider.enabled || provider.actions.contains("remove")
                 for action in provider.actions {
-                    let label=action=="authorize" ? "Autorizar acesso" : "Remover chave…"
+                    let label=action=="authorize" ? "Autorizar acesso" : action=="passive" ? "Usar leitura passiva…" : "Remover chave…"
                     let item=NSMenuItem(title:label,action:#selector(extraAction(_:)),keyEquivalent:"")
-                    item.target=self;item.representedObject=provider.key+":"+action;more.menu?.addItem(item)
+                    item.target=self;item.isEnabled=provider.enabled || action=="remove";item.representedObject=provider.key+":"+action;more.menu?.addItem(item)
                 }
                 more.setAccessibilityLabel("Mais opções de "+provider.name);view.addSubview(more)
             }
@@ -61,7 +74,7 @@ final class AccessSetup: NSObject {
     @objc func extraAction(_ sender:NSMenuItem) {
         guard let key=sender.representedObject as? String else{return}
         let parts=key.split(separator:":",maxSplits:1).map(String.init)
-        guard parts.count==2,let provider=providers.first(where:{$0.key==parts[0]}),provider.enabled,provider.actions.contains(parts[1]) else{return}
+        guard parts.count==2,let provider=providers.first(where:{$0.key==parts[0]}),(provider.enabled || parts[1]=="remove"),provider.actions.contains(parts[1]) else{return}
         onConfigure(key)
     }
     static func helperCommand(_ path:String)->String {

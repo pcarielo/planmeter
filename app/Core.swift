@@ -18,8 +18,13 @@ struct QuotaSnapshot: Codable {
     var sourceHost: String? = nil
     // Latest delivery from a passive source; not proof of a fresh provider API query.
     var receivedAt: Date? = nil
+    // Private continuity marker for the actual credential used by a successful query, not account identity.
+    var credentialScope:String? = nil
     var effectiveProvider: String { provider ?? "codex" }
     var remaining: Double? { windows.compactMap(\.remaining).min() }
+}
+func quotaCredentialScope(provider:String,key:String)->String {
+    "credential:"+SHA256.hash(data:Data((provider+"\0"+key).utf8)).map{String(format:"%02x",$0)}.joined()
 }
 enum QuotaError: Error {
     case message(String)
@@ -53,6 +58,10 @@ func parseQuota(_ result: [String: Any], now: Date = Date()) throws -> QuotaSnap
     snapshot.bucketID = bucket["limitId"] as? String ?? (map?["codex"] != nil ? "codex" : nil)
     return snapshot
 }
+func quotaWindowLabel(_ window:QuotaWindow)->String {
+    if window.name.localizedCaseInsensitiveContains("MCP") {return "MCP"}
+    return window.durationMinutes.map {$0 == 10080 ? "Semanal" : durationLabel($0)} ?? window.name
+}
 func durationLabel(_ minutes: Int?) -> String {
     guard let m = minutes else { return "duração não informada" }
     if m % 1440 == 0 { return "\(m / 1440) dias" }
@@ -71,6 +80,7 @@ func localDate(_ date: Date) -> String {
     return f.string(from: date)
 }
 struct RefreshPolicy {
+    var baseInterval:TimeInterval=60
     var busy = false
     var sleeping = false
     var failures = 0
@@ -85,12 +95,13 @@ struct RefreshPolicy {
         busy = false
         if success { failures = 0 } else if !sleeping { failures = min(5, failures + 1) }
     }
-    var interval: TimeInterval { min(900, 60 * pow(2, Double(max(0, failures - 1)))) }
+    var interval: TimeInterval { min(max(900,baseInterval), max(60,baseInterval) * pow(2, Double(max(0, failures - 1)))) }
     func delay(now: Date = Date()) -> TimeInterval {
         max(1, (lastAttempt ?? now).addingTimeInterval(interval).timeIntervalSince(now))
     }
 }
 
+enum AppServerPurpose {case quota,models}
 final class AppServerClient {
     private let lock = NSLock()
     private var process: Process?
@@ -98,7 +109,13 @@ final class AppServerClient {
     private(set) var quotaRequests = 0
     let binary: String
     let timeout: TimeInterval
-    init(binary: String, timeout: TimeInterval = 20) { self.binary = binary; self.timeout = timeout }
+    let purpose:AppServerPurpose
+    private(set) var models:[String]=[]
+    init(binary: String, timeout: TimeInterval = 20,purpose:AppServerPurpose = .quota) { self.binary = binary; self.timeout = timeout;self.purpose=purpose }
+    func readModels()throws->[String] {
+        guard purpose == .models else{throw QuotaError.message("Cliente não configurado para catálogo")}
+        _=try read();return models
+    }
     func cancel() {
         lock.lock(); cancelled = true; let p = process; lock.unlock()
         if let p = p, p.isRunning { p.terminate() }
@@ -184,6 +201,21 @@ final class AppServerClient {
         try send(["method": "initialized", "params": [:]])
         let account = try request("account/read", ["refreshToken": false])["account"] as? [String: Any]
         guard account?["type"] as? String == "chatgpt" else { throw QuotaError.message("Login ChatGPT gerenciado indisponível") }
+        if purpose == .models {
+            var cursor:String?;var seen=Set<String>()
+            for _ in 0..<8 {
+                var params:[String:Any]=["includeHidden":false,"limit":100]
+                if let cursor=cursor {params["cursor"]=cursor}
+                let result=try request("model/list",params)
+                guard let rows=result["data"] as? [[String:Any]] else{throw QuotaError.message("Catálogo indisponível")}
+                for row in rows {
+                    if let model=row["id"] as? String,model.count<=120,model.range(of:"^[A-Za-z0-9][A-Za-z0-9._:/-]*$",options:.regularExpression) != nil,seen.insert(model).inserted {models.append(model)}
+                }
+                cursor=result["nextCursor"] as? String
+                if cursor==nil {break}
+            }
+            return QuotaSnapshot(queriedAt:Date(),windows:[])
+        }
         let result = try request("account/rateLimits/read")
         var snapshot = try parseQuota(result)
         // Hash an official opaque account ID; never retain email, ID, or tokens.

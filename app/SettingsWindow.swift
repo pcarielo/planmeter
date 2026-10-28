@@ -17,6 +17,48 @@ struct InterfacePreferences: Codable, Equatable {
 }
 final class SettingsModel: ObservableObject {
     @Published var selected="general"
+    @Published var advancedExpanded=false
+    @Published var insight=InsightPreferences()
+    @Published var insightMessage=""
+    @Published var insightPath=""
+    @Published var insightBusy=false
+    @Published var insightPro=false
+    @Published var insightProviders:[String]=[]
+    @Published var insightModels:[String]=[]
+    var onInsightModels:()->Void={}
+    var onInsightChange:(InsightPreferences)->Void={_ in}
+    var onInsightCheck:()->Void={}
+    func chooseInsightProvider(_ provider:String) {
+        guard provider != insight.provider else{return}
+        insight.provider=provider;insight.model="";insight.executablePath="";insightModels=[]
+        if let preferred=InsightHarness.preferred(for:provider) {insight.harness=preferred}
+        insightMessage="Aplique as opções e busque os modelos do cliente escolhido."
+    }
+    func chooseInsightHarness(_ harness:InsightHarness) {
+        guard harness != insight.harness else{return}
+        insight.harness=harness;insight.model="";insight.executablePath="";insightModels=[]
+        insightMessage="Aplique as opções e busque os modelos do cliente escolhido."
+    }
+    func configureInsight(_ value:InsightPreferences) {let previous=updating;updating=true;insight=value;updating=previous}
+    @Published var licenseMessage="Free: até dois planos."
+    @Published var licensePrice:String?
+    @Published var licenseBusy=false
+    var onPurchase:()->Void={}
+    var onRestore:()->Void={}
+    #if PLANMETER_DEVELOPMENT
+    @Published var simulationPro=false {didSet{onSimulation(simulationPro)}}
+    var onSimulation:(Bool)->Void={_ in}
+    #endif
+    @Published var operations=OperationsSettings() {didSet{if !updating {onOperationsChange(operations.normalized())}}}
+    @Published var logError=""
+    var logsPath=""
+    var onOperationsChange:(OperationsSettings)->Void={_ in}
+    var onViewLog:(AuditCategory)->Void={_ in}
+    var onLogDirectory:()->Void={}
+    var onLoginAudit:(AuditOutcome)->Void={_ in}
+    func configureOperations(_ value:OperationsSettings,path:String,error:String?) {
+        let previous=updating;updating=true;operations=value;logsPath=path;logError=error ?? "";updating=previous
+    }
     @Published var accessRevision=0
     @Published var interface=InterfacePreferences() {didSet{commit()}}
     @Published var confetti=true {didSet{commit()}}
@@ -56,9 +98,9 @@ final class SettingsModel: ObservableObject {
         }
         do {
             if enabled {try SMAppService.mainApp.register()} else {try SMAppService.mainApp.unregister()}
-            refreshLogin()
+            refreshLogin();onLoginAudit(.success)
             if !loginPending {loginMessage="Preferência atualizada."}
-        } catch {refreshLogin();loginMessage="Não foi possível alterar. Confira Itens de Início do macOS."}
+        } catch {onLoginAudit(.failure);refreshLogin();loginMessage="Não foi possível alterar. Confira Itens de Início do macOS."}
     }
 }
 private struct AccessSettingsView: NSViewRepresentable {
@@ -78,13 +120,65 @@ private struct SettingsRootView: View {
                     if !model.loginMessage.isEmpty {Text(model.loginMessage).font(.system(size:13))}
                     Button("Abrir Itens de Início do macOS") {if !model.isTest {SMAppService.openSystemSettingsLoginItems()}}
                 }
+                Section("Licença") {
+                    Text(model.licenseMessage)
+                    HStack {
+                        Button(model.licensePrice.map{"Obter Pro · " + $0} ?? "Obter Pro"){model.onPurchase()}.disabled(model.licenseBusy || model.licensePrice == nil)
+                        Button("Restaurar compras"){model.onRestore()}.disabled(model.licenseBusy)
+                    }
+                    #if PLANMETER_DEVELOPMENT
+                    Toggle("Simular Pro (desenvolvimento, sem compra)",isOn:$model.simulationPro)
+                    #endif
+                }
                 Section("Atualizações de quota") {
-                    Text("Atualizar consulta as fontes disponíveis e respeita os intervalos dos provedores. O cache Claude se renova com o uso do cliente ou do coletor configurado.")
+                    Picker("Intervalo automático",selection:$model.operations.refreshSeconds) {
+                        Text("Automático por provedor").tag(0.0)
+                        Text("1 minuto").tag(60.0);Text("5 minutos").tag(300.0);Text("15 minutos").tag(900.0);Text("30 minutos").tag(1800.0);Text("1 hora").tag(3600.0)
+                    }
+                    Text("Atualizar consulta as fontes disponíveis e respeita os intervalos dos provedores. No modo automático, Codex e Claude passivo usam 1 minuto; os demais coletores usam 15 minutos.")
                     Text("Provedores sem métricas ficam ocultos. Saldo zero permanece visível.").foregroundColor(.secondary)
+                    if !model.logError.isEmpty {Text(model.logError).foregroundColor(.red)}
+                    DisclosureGroup("Avançado: registros locais",isExpanded:$model.advancedExpanded) {
+                        HStack {Toggle("Registrar cada consulta",isOn:$model.operations.queries);Button("Visualizar"){model.onViewLog(.queries)}}
+                        HStack {Toggle("Registrar mudanças de configuração",isOn:$model.operations.configuration);Button("Visualizar"){model.onViewLog(.configuration)}}
+                        HStack {Toggle("Registrar operações de acesso e chaves",isOn:$model.operations.access);Button("Visualizar"){model.onViewLog(.access)}}
+                        Text(model.logsPath).font(.system(size:12)).textSelection(.enabled)
+                        Button("Abrir pasta de logs e arquivos anteriores"){model.onLogDirectory()}
+                        Toggle("Rotacionar por tamanho",isOn:$model.operations.rotateBySize)
+                        Stepper("Tamanho por arquivo: \(model.operations.rotationMB) MB",value:$model.operations.rotationMB,in:1...100).disabled(!model.operations.rotateBySize)
+                        Picker("Rotacionar por período",selection:$model.operations.rotationDays) {Text("Desativado").tag(0);Text("Diariamente").tag(1);Text("Semanalmente").tag(7);Text("Mensalmente (30 dias)").tag(30)}
+                        Stepper("Retenção: \(model.operations.retentionDays) dias, mínimo de 3 meses",value:$model.operations.retentionDays,in:90...3650,step:30)
+                        Text("Padrão: 90 dias ou 3 meses completos, o que for maior. A rotação separa arquivos, sem apagar registros dentro da retenção. Chaves, tokens e respostas brutas nunca entram nos logs.").font(.system(size:13)).foregroundColor(.secondary)
+                    }
                 }
             }.formStyle(.grouped).tabItem{Label("Geral",systemImage:"gearshape")}.tag("general")
             AccessSettingsView(access:model.access).id(model.accessRevision).frame(width:620,height:560)
                 .tabItem{Label("Contas",systemImage:"person.crop.circle")}.tag("accounts")
+            Form {
+                Section("Insights do Pro") {
+                    Text("Uma ou duas linhas sobre o ritmo de consumo, com observações de até sete dias. Gerar insight usa o modelo escolhido e pode consumir a quota do plano.")
+                    if !model.insightPro {Text("Disponível no Pro. Veja Geral → Licença.").foregroundColor(.secondary)}
+                    Picker("Provedor do modelo",selection:Binding(get:{model.insight.provider},set:{model.chooseInsightProvider($0)})) {
+                        Text("Escolher…").tag("")
+                        ForEach(model.insightProviders,id:\.self) {key in Text(key == "claude" ? "Claude Code" : key == "kimi" ? "Kimi Code" : key.capitalized).tag(key)}
+                    }
+                    if !model.insightModels.isEmpty {
+                        Picker("Modelos encontrados",selection:$model.insight.model) {
+                            Text("Escolher…").tag("")
+                            ForEach(model.insightModels,id:\.self){name in Text(name).tag(name)}
+                        }
+                    }
+                    TextField("Modelo",text:$model.insight.model)
+                    Button("Buscar modelos no harness"){model.onInsightModels()}.disabled(model.insightBusy)
+                    Picker("Harness",selection:Binding(get:{model.insight.harness},set:{model.chooseInsightHarness($0)})) {ForEach(InsightHarness.compatible(with:model.insight.provider),id:\.self) {harness in Text(harness.title).tag(harness)}}
+                    TextField("Caminho alternativo (opcional)",text:$model.insight.executablePath)
+                    Text(model.insightPath.isEmpty ? "Executável não encontrado" : model.insightPath).font(.system(size:12)).textSelection(.enabled)
+                    Button("Aplicar opções"){model.onInsightChange(model.insight)}
+                    Button("Verificar conexão"){model.onInsightCheck()}.disabled(model.insightBusy || !model.insightPro)
+                    Text(model.insightMessage).foregroundColor(.secondary)
+                    Text("Confirme a conta no cliente escolhido; ela pode ser diferente da conta monitorada. O provedor recebe um resumo agregado de todos os planos ativos. Não são enviados chaves, transcrições ou arquivos dos seus projetos. A resposta é uma estimativa, não uma garantia.").font(.system(size:13)).foregroundColor(.secondary)
+                }.disabled(!model.insightPro)
+            }.formStyle(.grouped).tabItem{Label("Insights",systemImage:"sparkles")}.tag("insights")
             Form {
                 Section("Aparência") {
                     Picker("Tema",selection:$model.interface.appearance) {Text("Sistema").tag("system");Text("Claro").tag("light");Text("Escuro").tag("dark")}
@@ -108,7 +202,7 @@ private struct SettingsRootView: View {
                 Text("PlanMeter").font(.largeTitle.bold())
                 Text("Desenvolvido por Paulo Carielo").font(.system(size:16))
                 Text("Versão " + (Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "local"))
-                Text("Monitor local de quotas. Chaves no Keychain, leituras sem prompts de modelo e dados de quota mantidos neste Mac.").multilineTextAlignment(.center).foregroundColor(.secondary)
+                Text("Quotas e histórico locais. Chaves no Keychain. Insights opcionais enviam um resumo ao modelo escolhido.").multilineTextAlignment(.center).foregroundColor(.secondary)
                 Link("Privacidade e segurança",destination:URL(string:"https://github.com/pcarielo/planmeter/blob/main/docs/security.md")!)
                 Link("Suporte e código-fonte",destination:URL(string:"https://github.com/pcarielo/planmeter")!)
             }.padding(44).tabItem{Label("Sobre",systemImage:"info.circle")}.tag("about")
@@ -144,6 +238,16 @@ func runSettingsTests() {
     let model=SettingsModel();var changes=0
     model.onChange={_,_,_ in changes += 1};model.configure(interface:restored,confetti:false,respect:true)
     check(changes==0,"loading does not write preferences")
+    var operationsChanges=0
+    model.onOperationsChange={_ in operationsChanges += 1}
+    model.configureOperations(OperationsSettings(),path:"/fixture/Logs",error:nil)
+    check(operationsChanges==0,"loading operations does not save")
+    model.operations.refreshSeconds=300
+    check(operationsChanges==1,"interval changes propagate")
+    var selectedLog:AuditCategory?
+    model.onViewLog={selectedLog=$0};model.onViewLog(.access)
+    check(selectedLog == .access,"category viewer action is independent")
+
     model.interface.scale=1.25;check(changes==1,"user change propagates")
     let before=changes;model.syncInterface(restored);check(changes==before && model.interface.scale==1.5,"panel changes resync without writes")
     var latestScale=0.0;model.onChange={value,_,_ in latestScale=value.scale};model.confetti.toggle()
@@ -155,5 +259,25 @@ func runSettingsTests() {
     check(NSApp.activationPolicy() == .regular,"settings participate in app switching")
     settings.window?.close()
     check(NSApp.activationPolicy() == .accessory,"closing settings restores menu bar mode")
+    if ProcessInfo.processInfo.environment["PLANMETER_CAPTURE_FIXTURES"]=="1" {
+        settings.model.insightPro=true
+        settings.model.insightProviders=["codex","claude","kimi"]
+        settings.model.insightModels=["fixture-model"]
+        settings.model.insight.provider="kimi";settings.model.insight.harness = .pi;settings.model.insight.model="fixture-model"
+        settings.model.insightPath="/Applications/Example/bin/pi"
+        settings.model.insightMessage="Conexão verificada pelo harness."
+        settings.show(page:"insights")
+        RunLoop.current.run(until:Date().addingTimeInterval(0.3))
+        captureFixturePreview(settings.window!.contentView!,name:"insight-settings")
+        settings.show(page:"general");settings.model.advancedExpanded=true
+        RunLoop.current.run(until:Date().addingTimeInterval(0.3))
+        captureFixturePreview(settings.window!.contentView!,name:"general-advanced")
+        settings.window?.close()
+    }
+    var savedInsight=InsightPreferences();savedInsight.provider="kimi";savedInsight.harness = .pi;savedInsight.model="fixture-model"
+    model.configureInsight(savedInsight)
+    check(model.insight.harness == .pi && model.insight.model=="fixture-model","loading preserves an explicitly chosen alternate harness")
+    model.chooseInsightProvider("claude")
+    check(model.insight.harness == .claude && model.insight.model.isEmpty,"user provider change selects native harness and clears incompatible model")
     print("PASS Settings: \(count) checks; no login-item changes")
 }

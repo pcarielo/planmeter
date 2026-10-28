@@ -8,16 +8,21 @@ ARCH="${PLANMETER_ARCH:-$(uname -m)}"
 case "$ARCH" in arm64|x86_64) ;; *) echo 'Unsupported architecture.' >&2; exit 2 ;; esac
 APP="$ROOT/build/PlanMeter.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-xcrun swiftc -swift-version 5 -O -target "$ARCH-apple-macosx13.0" -framework AppKit -framework Security app/*.swift -o "$APP/Contents/MacOS/PlanMeter"
+SWIFT_FLAGS=(-swift-version 5)
+if [[ "${PLANMETER_DEVELOPMENT:-0}" == 1 ]]; then SWIFT_FLAGS+=(-D PLANMETER_DEVELOPMENT); fi
+xcrun swiftc "${SWIFT_FLAGS[@]}" -O -target "$ARCH-apple-macosx13.0" -framework AppKit -framework Security app/*.swift -o "$APP/Contents/MacOS/PlanMeter"
 python3 - "$ROOT" "$APP" <<'PY'
-import pathlib, plistlib, shutil, sys
+import os, pathlib, plistlib, re, shutil, sys
 root, app=map(pathlib.Path,sys.argv[1:])
 resources=root/'app/Resources'
 if resources.exists(): shutil.copytree(resources,app/'Contents/Resources',dirs_exist_ok=True)
 integration=app/'Contents/Resources/Integration'; integration.mkdir(parents=True,exist_ok=True)
 for name in ('configure-claude.py','claude-statusline-wrapper.py','claude-statusline-cache.py'):
     shutil.copy2(root/'scripts'/name,integration/name)
-info={'CFBundleIdentifier' :'io.github.pcarielo.planmeter','CFBundleName':'PlanMeter','CFBundleDisplayName':'PlanMeter','CFBundleExecutable':'PlanMeter','CFBundlePackageType':'APPL','CFBundleShortVersionString':'1.5.3','CFBundleVersion':'12','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSHighResolutionCapable':True}
+product_id=os.environ.get('PLANMETER_PRO_PRODUCT_ID','io.github.pcarielo.planmeter.pro')
+if not re.fullmatch(r'[A-Za-z0-9._-]{1,255}',product_id): raise SystemExit('Invalid Pro product identifier.')
+info={'CFBundleIdentifier' :'io.github.pcarielo.planmeter','CFBundleName':'PlanMeter','CFBundleDisplayName':'PlanMeter','CFBundleExecutable':'PlanMeter','CFBundlePackageType':'APPL','CFBundleShortVersionString':'1.6.0','CFBundleVersion':'13','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSHighResolutionCapable':True}
+info['PlanMeterProProductID']=product_id
 if (app/'Contents/Resources/AppIcon.icns').exists(): info['CFBundleIconFile']='AppIcon'
 with (app/'Contents/Info.plist').open('wb') as f: plistlib.dump(info,f)
 PY
