@@ -1,5 +1,13 @@
 # Alterações
 
+## 1.6.0 - 2026-10-28
+
+- Intervalo de atualização configurável e logs privados com rotação e retenção mínima de três meses.
+- Consulta ativa do Claude pelo cliente oficial, com rejeição de telas antigas ou parciais e alternativa passiva identificada.
+- Edição Free com até dois planos; política Pro verificada e simulação local de desenvolvimento.
+- Insights por seis harnesses, histórico de observações, projeções locais e indicação de data, fonte e desatualização.
+- Marco `pre-insights` preserva a versão 1.5.3 anterior a estas mudanças.
+
 ## 1.5.3 - 2026-10-26
 
 - Claude distingue a entrega recente da statusline da última mudança de conteúdo, evitando aviso de dado antigo apenas porque a cota não mudou.

@@ -18,7 +18,7 @@ Clique no indicador para abrir o painel completo. Só aparecem provedores com pe
 - **Configurações** abre uma janela independente com contas, aparência, início automático, avisos e informações do aplicativo.
 - **×** fecha o painel e desativa a fixação. Sem fixar, um clique no conteúdo também o fecha; os controles continuam utilizáveis.
 
-Uma falha temporária de consulta pode preservar a última métrica conhecida, marcada como desatualizada. No Claude, o horário de recebimento identifica a última entrega da statusline. A indicação de leitura passiva não confirma uma consulta nova à API: os valores podem permanecer iguais. Se a fonte parar de entregar dados, o cartão informa que aguarda atualização do Claude Code; Atualizar relê o cache local. O Kimi só aparece após uma consulta autenticada nesta execução e fica oculto se o acesso à chave falhar. O cache não comprova autenticação.
+Uma falha temporária pode preservar a última métrica conhecida, marcada como desatualizada. O Claude oferece consulta ativa de quota pela tela `/usage` do cliente oficial, após ativação em Contas. A leitura passiva da statusline continua disponível como alternativa, identificada no cartão. Na alternativa passiva, Atualizar apenas relê o cache. O Kimi fica oculto quando não há acesso autenticado nesta execução. Cache não comprova autenticação.
 
 ## Histórico e avisos de renovação
 
@@ -39,18 +39,30 @@ As imagens usam dados fictícios. O aviso foi capturado na interface real com um
 | Provedor | Fonte | Preparação |
 | --- | --- | --- |
 | Codex | `account/read` e `account/rateLimits/read` do Codex CLI oficial, via stdio | Instalar o CLI e entrar na conta pelo fluxo oficial |
-| Claude Code | Cache local alimentado pela statusline do Claude Code | Configurar o helper incluído neste repositório |
+| Claude Code | Consulta ativa de quota ou statusline passiva | Ativar a leitura pelo cliente oficial, ou configurar o helper passivo |
 | Z.ai | Endpoint HTTPS de quota | Cadastrar sua chave no menu do aplicativo |
 | Kimi Code | Endpoint de uso do Coding Plan | Cadastrar a chave Kimi Code no Keychain pelo menu |
 | Grok Unified | Consulta de quota pelo Grok Build oficial | Instalar o cliente e autenticar a assinatura com `grok login` |
 
 O build padrão obtém os favicons dos sites dos provedores e os guarda somente no build local. Para usar ícones de iniciais sem esse download, execute `PLANMETER_ICON_MODE=initials ./scripts/install.sh`. As janelas e previsões de reset dependem das informações retornadas por cada provedor.
 
-O cache do Claude Code se renova quando há atividade no Claude Code. Atualizar o PlanMeter não força uma nova consulta de quota desse provedor.
+Na consulta ativa do Claude, Atualizar solicita uma nova leitura do serviço, respeitando o prazo entre consultas. O aplicativo não renova nem altera o login do Claude. Um login expirado precisa ser resolvido no cliente oficial.
+
+## Free, Pro e insights
+
+Free permite selecionar até dois planos em Contas. Pro libera todos os planos e uma análise curta do ritmo de consumo, exibida abaixo dos cartões. Gerar o insight é uma ação explícita e pode consumir a quota do modelo escolhido. A atualização de quotas continua sem chamadas de modelo.
+
+A compra Pro usa a verificação do StoreKit e depende da futura configuração da distribuição Apple. Quando indisponível, o botão não oferece uma compra fictícia. O build de desenvolvimento permite testar Free e Pro sem pagamento.
+
+Veja [como configurar e testar insights](docs/insights.md). Os dados analisados são observações locais de até sete dias, com limites de cobertura e identificação. A resposta mostra data e fonte e é sinalizada quando fica desatualizada.
+
+## Intervalos e logs
+
+Geral permite escolher o intervalo de atualização e abrir as opções avançadas de registro. Há logs separados para consultas, mudanças de configuração e operações de acesso, com rotação e retenção mínima de três meses. Chaves e respostas brutas não entram nesses arquivos. Consulte [atualização e registros locais](docs/logs.md).
 
 ## Instalação a partir do código
 
-Requisitos: macOS 13 ou posterior, Xcode Command Line Tools, Python 3 e Git. Build e testes com fixtures passaram em Apple Silicon no macOS 14 e 15 pelo GitHub Actions, e no macOS 26 localmente. macOS 13 e Macs Intel ainda não foram validados em execução.
+Requisitos: macOS 13 ou posterior, Xcode Command Line Tools, Python 3 e Git. A suíte completa de testes também usa Node.js 18 ou posterior; o aplicativo não depende dele para monitorar quotas. O adaptador Prime usa Node.js no seu canal local protegido. Build e testes com fixtures passaram em Apple Silicon no macOS 14 e 15 pelo GitHub Actions, e no macOS 26 localmente. macOS 13 e Macs Intel ainda não foram validados em execução.
 
 ```sh
 git clone https://github.com/pcarielo/planmeter.git
@@ -72,7 +84,7 @@ Abra **Configurações → Contas** no painel ou use `⌘,` com a janela do apli
 Z.ai e Kimi abrem o cadastro seguro de chave no Keychain. Codex, Claude e Grok oferecem instruções, comando copiável e guia de configuração. O aplicativo não executa logins nem altera configurações de terceiros automaticamente. Se o Keychain exigir permissão, escolha **Autorizar acesso** na aba Contas; coletas automáticas não abrem pedidos de senha. A chave fica persistida no Keychain e pode ser reutilizada em memória durante a execução.
 
 - **Codex:** use uma instalação oficial do Codex CLI já autenticada. O aplicativo procura o executável no `PATH` e em locais comuns. Um caminho explícito pode ser definido em `codexPath` no arquivo de configuração local.
-- **Claude Code:** execute `python3 scripts/configure-claude.py --check` para inspecionar a configuração. Depois, `python3 scripts/configure-claude.py --apply` configura o helper com backup e preserva a statusline existente por meio de um wrapper.
+- **Claude Code:** autorize a consulta ativa em Contas. Para usar a alternativa passiva, execute `python3 scripts/configure-claude.py --check` para inspecionar a configuração. Depois, `python3 scripts/configure-claude.py --apply` configura o helper com backup e preserva a statusline existente por meio de um wrapper.
 - **Z.ai:** abra **Configurações → Contas → Z.ai** e escolha **Cadastrar chave**. O prompt seguro grava a chave no Keychain do macOS.
 - **Kimi Code:** use a chave emitida no console do Coding Plan, não a chave da plataforma Moonshot API. O menu oferece cadastro seguro, remoção e consulta. O OAuth de outros aplicativos não é acessado nem alterado.
 - **Grok Unified:** instale o Grok Build oficial e conclua `grok login`. O PlanMeter consulta a assinatura pelo cliente autenticado, sem copiar tokens.
@@ -100,7 +112,7 @@ instrucoes:
 
 O estado local fica em `~/Library/Application Support/PlanMeter/`. As chaves Z.ai e Kimi ficam no Keychain, separadas da configuração. O aplicativo não lê credenciais de outros aplicativos para obter essas chaves.
 
-As consultas Z.ai automáticas têm intervalo de 15 minutos. A atualização manual respeita um intervalo mínimo de 60 segundos e o tratamento de respostas HTTP 429. Monitorar quotas não autoriza criar sessões de modelo, comprar créditos, alterar planos ou executar resets.
+O modo automático preserva a cadência de cada provedor; um intervalo escolhido em Geral substitui esse padrão. Claude ativo, Z.ai, Kimi e Grok respeitam ao menos 60 segundos entre consultas. Os coletores HTTP também tratam respostas 429. Monitorar quotas não autoriza criar sessões de modelo, comprar créditos, alterar planos ou executar resets.
 
 A [documentação de segurança](docs/security.md) descreve o armazenamento e os limites de acesso. Para relatar uma vulnerabilidade, consulte [SECURITY.md](SECURITY.md).
 
