@@ -118,7 +118,7 @@ struct InsightBasis {
     }
     static func signature(_ values:[UsageProjection])->[String] {
         values.map {value in
-            [value.provider,value.window,String(value.remaining),value.resetAt.map{String($0)} ?? "none",value.percentPerHour.map{String($0)} ?? "none",value.riskBeforeReset.map{String($0)} ?? "none",value.reason ?? "valid"].joined(separator:"|")
+            [value.provider,value.window,String(value.remaining),value.resetAt.map{String($0)} ?? "none",value.percentPerHour.map{String($0)} ?? "none",value.riskBeforeReset.map{String($0)} ?? "none",value.reason ?? "valid",value.periodFirstObservedRemainingPercent.map{String($0)} ?? "none"].joined(separator:"|")
         }.sorted()
     }
 }

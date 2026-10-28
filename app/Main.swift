@@ -57,10 +57,15 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     lazy var usagePersistence=UsagePersistence(file:cacheDirectory.appendingPathComponent("usage-timeline.json"))
     func loadUsageTimeline() {
         let file=cacheDirectory.appendingPathComponent("usage-timeline.json")
-        guard FileManager.default.fileExists(atPath:file.path) else{return}
-        do {usageTimeline=try JSONDecoder().decode(UsageTimeline.self,from:Data(contentsOf:file))}
-        catch {timelineWriteBlocked=true}
+        if FileManager.default.fileExists(atPath:file.path) {
+            do {usageTimeline=try JSONDecoder().decode(UsageTimeline.self,from:Data(contentsOf:file))}
+            catch {timelineWriteBlocked=true;return}
+        }
+        if usageTimeline.restoreRecordedObservations(["codex":detector.state,"claude":claudeDetector.state]) {
+            timelineRevision += 1;timelineDirty=true
+        }
     }
+
     func captureUsageTimeline() {
         var changed=false
         for value in [snapshot,claudeSnapshot,zaiSnapshot,kimi.snapshot,grok.snapshot].compactMap({$0}) {
@@ -280,7 +285,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let values:[(String,QuotaSnapshot?,Bool)]=[
             ("codex",snapshot,stale(snapshot,error:errorText)),("claude",claudeSnapshot,stale(claudeSnapshot,error:claudeError)),
             ("zai",zaiSnapshot,stale(zaiSnapshot,error:zaiError)),("kimi",kimi.snapshot,kimi.stale),("grok",grok.snapshot,grok.stale)]
-        return values.filter{allowed($0.0) && !$0.2}.compactMap{$0.1}.flatMap{usageTimeline.projections(for:$0,maximumGap:max(3600,operations.interval(for:$0.effectiveProvider)*1.5),connectionID:$0.credentialScope)}
+        return values.filter{allowed($0.0) && !$0.2}.compactMap{$0.1}.flatMap{usageTimeline.projections(for:$0,maximumGap:max(3600,operations.interval(for:$0.effectiveProvider)*1.5),connectionID:$0.credentialScope,renewals:renewalHistory.entries)}
     }
     func generateInsight() {
         guard !timelineWriteBlocked else{settingsWindow.model.insightMessage="O histórico de uso precisa ser recuperado antes de gerar insights.";return}
@@ -302,13 +307,24 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ].compactMap {$0}.filter{allowed($0.key)}
         dashboard.onAccess = { [weak self] in guard let self=self else{return};self.showSettings(page:QuotaCard.available(self.dashboard.cards).isEmpty ? "accounts" : "general") }
         dashboard.onRefresh = { [weak self] in self?.manualRefresh() }
-        dashboard.refreshEnabled = !activity.suspended && !policy.busy && !claudeQuota.busy && !kimi.busy && !grok.busy
+        let states=providerRefreshStates()
+        let activeBusy=states.contains {allowed($0.provider) && $0.busy && $0.provider != "zai"}
+        dashboard.refreshEnabled = !activity.suspended && !activeBusy
         if let warning=auditLog.statusMessage {dashboard.refreshMessage=warning}
         else if !dashboard.refreshMessage.isEmpty {
-            let claudeMessage=claudeQuota.enabled ? claudeQuota.message : claudeError ?? (claudeSnapshot == nil ? "Claude: aguardando dados do cliente" : "Claude: leitura local concluída")
-            dashboard.refreshMessage = (policy.busy || claudeQuota.busy || kimi.busy || grok.busy || zaiBusy) ? "Atualizando dados…" : ([claudeMessage,zaiRefreshMessage,kimi.message,grok.message].compactMap{$0}.joined(separator:" · "))
+            dashboard.refreshMessage=ProviderRefreshState.summary(states,selected:planAccess.active)
         }
         dashboard.update()
+    }
+    func providerRefreshStates()->[ProviderRefreshState] {
+        let claudeMessage=claudeQuota.enabled ? claudeQuota.message : claudeError ?? (claudeSnapshot == nil ? "Claude: aguardando dados do cliente" : "Claude: leitura local concluída")
+        return [
+            ProviderRefreshState(provider:"codex",message:nil,busy:policy.busy),
+            ProviderRefreshState(provider:"claude",message:claudeMessage,busy:claudeQuota.busy),
+            ProviderRefreshState(provider:"zai",message:zaiRefreshMessage,busy:zaiBusy),
+            ProviderRefreshState(provider:"kimi",message:kimi.message,busy:kimi.busy),
+            ProviderRefreshState(provider:"grok",message:grok.message,busy:grok.busy)
+        ]
     }
     func prepareAccessSettings() {
         func status(_ snapshot:QuotaSnapshot?)->String {StatusPresentation.validRemaining(snapshot)==nil ? "Sem métrica disponível" : "Métrica disponível em cache"}
@@ -793,7 +809,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             fputs("Testes AppKit exigem pacote isolado. Use python3 tests/run-ui-tests.py.\n", stderr)
             exit(2)
         }
-        if CommandLine.arguments.contains("--self-test") { runClaudeCLIProbeTests();runClaudeCLIParserTests();runLicenseTests();runUsagePersistenceTests();runInsightModelTests();runInsightAdapterTests();runInsightRunnerTests();runHarnessDiscoveryTests();runPlanAccessTests();runUsageTimelineTests();runOperationsTests();runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests();runCredentialPolicyTests();runGrokTests(); runLocalClientTests(); return }
+        if CommandLine.arguments.contains("--self-test") { runClaudeCLIProbeTests();runClaudeCLIParserTests();runLicenseTests();runUsagePersistenceTests();runInsightModelTests();runInsightAdapterTests();runInsightRunnerTests();runHarnessDiscoveryTests();runPlanAccessTests();runUsageTimelineTests();runProviderRefreshTests();runOperationsTests();runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests();runCredentialPolicyTests();runGrokTests(); runLocalClientTests(); return }
         if CommandLine.arguments.contains("--confetti-self-test") { runConfettiTests(); return }
         if CommandLine.arguments.contains("--loop-self-test") { runLoopTests(); return }
         if CommandLine.arguments.contains("--ui-self-test") {

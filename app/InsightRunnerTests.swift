@@ -55,9 +55,11 @@ func runInsightRunnerTests() {
     }
     check((try? InsightText.validate("riskBeforeReset é true"))==nil,"internal field names never reach the user")
     let clock=Date(timeIntervalSince1970:1800000000)
-    let projected=UsageProjection(provider:"codex",window:"Semanal",remaining:10,observedAt:clock.timeIntervalSince1970,resetAt:clock.timeIntervalSince1970+7200,observedHours:24,sampleCount:49,percentPerHour:10,estimatedExhaustionAt:clock.timeIntervalSince1970+3600,riskBeforeReset:true)
+    let projected=UsageProjection(provider:"codex",window:"Semanal",remaining:10,observedAt:clock.timeIntervalSince1970,resetAt:clock.timeIntervalSince1970+7200,observedHours:24,sampleCount:49,percentPerHour:10,estimatedExhaustionAt:clock.timeIntervalSince1970+3600,riskBeforeReset:true,identityEvidence:"unknown",reason:"account_unidentified")
     let payload=try! JSONSerialization.jsonObject(with:InsightText.prompt([projected],now:clock,timeZone:TimeZone(identifier:"America/Fortaleza")!)) as! [String:Any]
     let row=(payload["projections"] as! [[String:Any]])[0]
+    check((try? InsightText.validate("A data é resetDateLocal, 3 de novembro."))==nil,"new internal date field cannot leak into prose")
+    check(row["reason"]==nil && row["identityEvidence"]==nil && row["remainingPercent"] as? Double==10,"model receives useful percentage facts without internal authentication diagnostics")
     check(row["hoursUntilReset"] as? Double==2 && row["hoursUntilExhaustion"] as? Double==1,"relative hours are calculated locally")
     check((row["resetLocal"] as? String)?.hasSuffix("-03:00")==true && payload["timeZone"] as? String=="America/Fortaleza","model receives explicit local timezone")
     write("printf '{\"error\":\"node_version\"}\\n'\n")
