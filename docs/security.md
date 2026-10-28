@@ -2,9 +2,9 @@
 
 ## Limites de acesso
 
-O PlanMeter acompanha quotas. Não inicia turnos de modelo, compra créditos, altera planos ou executa resets. Não exige SSH, host remoto ou Linux.
+O PlanMeter acompanha quotas. Medir quotas não inicia turnos de modelo, compra créditos, altera planos ou executa resets. A geração opcional de insights no Pro usa explicitamente o modelo escolhido pelo usuário e pode consumir sua quota. Não exige SSH, host remoto ou Linux.
 
-O Codex é consultado pelo CLI oficial já autenticado, por stdio, usando `account/read` e `account/rateLimits/read`. O Claude Code é observado por um cache local alimentado pela statusline. A Z.ai é consultada por GET em um endpoint HTTPS fixo de quota.
+O Codex é consultado pelo CLI oficial já autenticado, por stdio, usando `account/read` e `account/rateLimits/read`. O Claude Code pode ser consultado ativamente após consentimento ou observado pela statusline passiva. A Z.ai é consultada por GET em um endpoint HTTPS fixo de quota.
 
 ## Armazenamento local
 
@@ -24,9 +24,9 @@ A desinstalação preserva a chave. Removê-la é uma decisão separada.
 
 ## Frequência e falhas
 
-A consulta automática Z.ai usa intervalo de 15 minutos. A consulta manual tem intervalo mínimo de 60 segundos. Respostas HTTP 429 também restringem tentativas. Falha de acesso, cache antigo e campo ausente não devem ser interpretados como saldo zero.
+A consulta automática segue o intervalo configurado, com padrão de 15 minutos. A consulta manual tem intervalo mínimo de 60 segundos. Respostas HTTP 429 também restringem tentativas. Falha de acesso, cache antigo e campo ausente não devem ser interpretados como saldo zero.
 
-O cache Claude Code só se renova com atividade do Claude Code. Dados locais não comprovam disponibilidade atual no provedor.
+No modo passivo, o cache Claude Code só se renova com atividade do cliente. Dados locais não comprovam disponibilidade atual no provedor.
 
 ## Distribuição
 
@@ -59,3 +59,27 @@ Se o Keychain estiver bloqueado ou negar acesso, o monitor preserva a última qu
 A exportação CSV acontece somente quando o usuário aciona o botão e escolhe o destino. O arquivo contém os registros completos, com datas em ISO 8601, evidência e referência abreviada da conta. Campos de texto são escapados e protegidos contra interpretação como fórmulas em planilhas. Dados de uso reais e CSVs exportados não devem entrar no repositório.
 
 Se o arquivo de histórico não puder ser decodificado, a versão anterior é preservada em um arquivo de recuperação e o aplicativo informa a falha. Se não puder preservar o original, a gravação fica suspensa para evitar sobrescrevê-lo.
+
+## Consulta ativa Claude
+
+O PlanMeter abre o binário oficial e lê a tela `/usage` sem acessar o item do Claude no Keychain. Ferramentas, MCP e hooks ficam desativados nessa consulta. O terminal é limitado em tempo e volume de saída; seu conteúdo não é gravado nos logs do aplicativo. O cache guarda apenas quotas e horários.
+
+A pasta de consulta é exclusiva do PlanMeter. A coleta automática não aceita diálogos de confiança ou login. O cliente oficial pode manter seu próprio estado local; o PlanMeter não remove sessões de outros projetos. A alternativa passiva continua disponível.
+
+## Insights e licenças
+
+Os adaptadores usam o cliente escolhido e sua autenticação existente. O PlanMeter não extrai chaves dos harnesses. O provedor do insight recebe um agregado das métricas de todos os planos ativos; o usuário deve considerar esse compartilhamento ao escolher o gerador.
+
+O runner limita tempo, entrada e saída, encerra o grupo de processos e não encaminha variáveis incidentais de API key. Ferramentas são desativadas ou negadas conforme o contrato do cliente. O Prime exige contenção externa adicional e um gateway CONNECT efêmero que aceita apenas os hosts do Coding Plan, recusa endereços privados e preserva o TLS. Essa contenção restringe criação de processos, escrita e conexões TCP, mas não isola leitura de arquivos, Mach, XPC ou AppleEvents. Não há fallback para execução sem essa proteção. O Kimi e o OpenCode podem manter seus próprios registros locais do insight.
+
+StoreKit concede Pro somente a uma transação verificada do produto esperado. A preferência de planos não é prova de licença. A simulação Free/Pro é compilada apenas no modo de desenvolvimento. Esses controles não são uma promessa de proteção contra alterações no código-fonte distribuído sob MIT.
+
+Veja [insights](insights.md) e [logs](logs.md) para alcance, retenção e limites. A distribuição ainda não foi submetida à App Store. A execução de CLIs externos e a contenção do Prime exigem avaliação específica para essa distribuição futura.
+
+## Compatibilidade com a autenticação Claude
+
+A [política de autenticação da Anthropic](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use) restringe a coleta e intermediação de tokens de sessão do Claude.ai por desenvolvedores de terceiros. O consentimento local do usuário não substitui as condições do provedor.
+
+O protótipo que lia o token no Keychain foi removido. A consulta ativa usa a tela de uso do binário oficial, sem extrair a credencial. Essa rota foi validada em consulta real com Claude Code 2.1.312, sem extrair credenciais ou enviar um pedido ao modelo.
+
+Para gerar insights com uma assinatura Claude, o PlanMeter oferece somente o Claude Code oficial, sem modificar o binário. As rotas Claude por pi e OpenCode foram retiradas. Os demais provedores continuam sujeitos aos seus próprios contratos e às rotas documentadas.

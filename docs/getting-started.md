@@ -43,7 +43,9 @@ Preserve outras propriedades já presentes nesse arquivo. Não coloque tokens, s
 
 ## Claude Code
 
-Em **Configurações → Contas → Claude Code**, use **Copiar comando**. O caminho é absoluto e aponta para o configurador incluído no aplicativo; você pode executá-lo de qualquer pasta do Terminal.
+Em **Configurações → Contas**, selecione o Claude e escolha **Autorizar acesso**. Ative a consulta pela tela `/usage` do cliente oficial. O login permanece sob controle do Claude Code. Se houver um pedido de confiança para a pasta exclusiva de consulta, confirme-o no fluxo de configuração.
+
+Para usar a alternativa passiva, escolha **Usar leitura passiva** no menu do Claude e depois **Copiar comando**. O caminho é absoluto e aponta para o configurador incluído no aplicativo; você pode executá-lo de qualquer pasta do Terminal.
 
 O helper requer Python 3. Primeiro, inspecione a configuração:
 
@@ -67,13 +69,13 @@ Em **Configurações → Contas → Z.ai**, escolha **Cadastrar chave** e digite
 
 Não passe a chave em comandos, argumentos, variáveis de ambiente ou arquivos de configuração. Para removê-la, use a opção correspondente no menu do aplicativo.
 
-As consultas automáticas ocorrem a cada 15 minutos. Consultas manuais respeitam um intervalo mínimo de 60 segundos. Respostas HTTP 429 também limitam novas tentativas.
+No modo automático por provedor, as consultas ocorrem a cada 15 minutos. Geral permite escolher outro intervalo. Consultas manuais respeitam um intervalo mínimo de 60 segundos. Respostas HTTP 429 também limitam novas tentativas.
 
 ## Kimi Code
 
 Em **Configurações → Contas → Kimi Code**, escolha **Cadastrar chave** e cadastre a chave do Kimi Code/Coding Plan no prompt seguro. Ela fica no Keychain deste Mac. Chaves da plataforma Moonshot API são diferentes. O aplicativo não importa nem modifica o OAuth de outros programas.
 
-A barra mostra separadamente o saldo de 5h e o semanal quando o provedor informa essas janelas. A coleta automática ocorre a cada 15 minutos; a manual respeita 60 segundos e eventuais restrições HTTP 429. Sem chave ou resposta válida, o aplicativo indica indisponibilidade.
+A barra mostra separadamente o saldo de 5h e o semanal quando o provedor informa essas janelas. No modo automático por provedor, a coleta ocorre a cada 15 minutos; a manual respeita 60 segundos e eventuais restrições HTTP 429. Sem chave ou resposta válida, o aplicativo indica indisponibilidade.
 
 ## Grok Unified
 
@@ -104,3 +106,7 @@ Também é possível ativá-lo na instalação com `./scripts/install.sh --login
 ```
 
 A desinstalação preserva os dados locais e a chave no Keychain. Se quiser remover a chave, faça isso pelo menu do aplicativo antes de desinstalá-lo. Decida separadamente se deseja excluir o histórico e as preferências em `~/Library/Application Support/PlanMeter/`.
+
+## Edição e registros
+
+Contas permite selecionar até dois planos no Free. Pro libera todos e os insights. As chaves de planos desativados são preservadas e podem ser removidas pelo menu da conta. Consulte [insights e simulação Free/Pro](insights.md) e [intervalos e logs](logs.md).

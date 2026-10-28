@@ -10,14 +10,13 @@ Erros de autenticação devem ser resolvidos pelo fluxo oficial do CLI, com part
 
 ## Claude Code
 
-A fonte é o cache local gerado a partir dos dados que o Claude Code fornece à sua statusline. O PlanMeter não usa uma chamada de inferência para produzir esse dado.
+A consulta ativa lê a tela `/usage` do Claude Code oficial em um terminal privado. O cliente cuida do próprio login; o PlanMeter não extrai, armazena ou encaminha o token da assinatura. Não é enviado um pedido ao modelo.
 
-O configurador `scripts/configure-claude.py` oferece dois modos:
+O usuário ativa essa consulta em Contas. Se o cliente exigir confiança na pasta exclusiva `~/Library/Application Support/PlanMeter/ClaudeProbe`, a configuração precisa ser confirmada pelo usuário. A coleta automática não aceita esse diálogo. Uma consulta incompleta preserva a última leitura, sem atribuir a ela um horário novo.
 
-- `--check`: inspeção sem alterar a configuração.
-- `--apply`: configuração com backup e wrapper para preservar a statusline existente.
+A statusline continua como alternativa passiva. O configurador `scripts/configure-claude.py --check` inspeciona a configuração; `--apply` cria backup e preserva a statusline existente por wrapper. Nessa alternativa, a atualização depende da atividade do cliente.
 
-O helper `scripts/claude-statusline-cache.py` grava o cache usado pelo aplicativo. A atualização depende de atividade no Claude Code e dos campos que sua versão e conta disponibilizam. Atualizar o menu não renova a origem. Ausência de cache ou de campos não significa saldo zero. O helper é passivo e não verifica a identidade da conta; o PlanMeter não infere resets Claude com identidade inventada.
+A tela do CLI pode mudar entre versões. A leitura foi validada com Claude Code 2.1.312, além dos testes de interpretação e de terminal com dados fictícios. A execução desativa telemetria e relatórios de erro separadamente: a opção ampla `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` impediu o carregamento de `/usage` nessa versão. A integração não presume identidade de conta quando o cliente não a fornece.
 
 ## Z.ai
 
@@ -38,7 +37,7 @@ A fonte é `GET https://api.kimi.com/coding/v1/usages`, usada pelo comando de us
 
 O resumo `usage` é tratado como semanal conforme o parser oficial do Kimi CLI. As demais janelas são identificadas pela duração retornada. A barra mostra 5h e semanal separadamente; períodos ausentes ficam indisponíveis. Limite zero ou uso ausente não vira saldo zero. A integração não mede saldo financeiro da plataforma Moonshot API nem infere quota mensal não informada.
 
-A coleta automática respeita 15 minutos; a manual, no mínimo 60 segundos. Respostas 429 ampliam a espera. Os prazos são preservados após reiniciar o aplicativo. Erros preservam a última quota, marcada como desatualizada. Pausa e bloqueio cancelam a solicitação pendente.
+A coleta automática segue o intervalo escolhido em Geral, com padrão de 15 minutos; a manual, no mínimo 60 segundos. Respostas 429 ampliam a espera. Os prazos são preservados após reiniciar o aplicativo. Erros preservam a última quota, marcada como desatualizada. Pausa e bloqueio cancelam a solicitação pendente.
 
 Não é necessário iniciar conversa com modelo para consultar a quota. O cadastro ocorre no prompt seguro do menu, nunca por chat, argumento, ambiente ou arquivo de configuração. OAuth existente de outros aplicativos fica intacto; esta versão não importa nem renova seus tokens.
 
@@ -70,7 +69,7 @@ O cartão usa períodos em português: **Semanal**, **Mensal** e **Uso incluído
 
 Créditos adicionais comprados (Extra Usage Credits), saldo pré-pago e consumo adicional cobrado à parte (Pay-as-you-go/Additional Usage) não são somados ao percentual. Eles possuem campos e controles separados no provedor. Contas mostra o alcance resumido, e o botão do Grok abre a explicação da medição junto às instruções de conexão.
 
-A coleta automática usa intervalo de 15 minutos; a manual respeita 60 segundos. O aplicativo procura o executável em `~/.grok/bin`, `~/.local/bin`, `/opt/homebrew/bin` e `/usr/local/bin`. Não lê arquivos de tokens nem cria sessões de conversa.
+A coleta automática segue o intervalo escolhido em Geral, com padrão de 15 minutos; a manual respeita 60 segundos. O aplicativo procura o executável em `~/.grok/bin`, `~/.local/bin`, `/opt/homebrew/bin` e `/usr/local/bin`. Não lê arquivos de tokens nem cria sessões de conversa.
 
 Fontes oficiais verificadas em 23/10/2026:
 

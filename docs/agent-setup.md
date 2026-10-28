@@ -16,7 +16,7 @@ Não procure segredos em arquivos pessoais, credenciais de outros aplicativos, h
 
 **Codex:** confirme que o CLI oficial está disponível. Se for necessário configurar `codexPath`, use um caminho absoluto e preserve outras propriedades do arquivo. O monitor consulta apenas `account/read` e `account/rateLimits/read`. Se a autenticação estiver ausente ou expirada, devolva o fluxo oficial ao usuário. Não inicie login, crie tokens ou execute turnos de modelo sem pedido específico.
 
-**Claude Code:** execute `python3 scripts/configure-claude.py --check` antes de alterar a configuração. Quando a configuração da integração estiver autorizada, use `--apply`, que faz backup e preserva a statusline existente com um wrapper. Não substitua `statusLine` manualmente. O cache fica em `~/Library/Application Support/PlanMeter/claude-statusline.json`. Não abra uma sessão de modelo para forçar sua atualização.
+**Claude Code:** a consulta ativa usa a tela `/usage` do cliente oficial, após ativação em Contas. Não leia ou extraia o token do cliente. A confiança na pasta exclusiva deve ser confirmada pelo usuário; nunca a aceite em uma coleta automática. Para a alternativa passiva, execute `python3 scripts/configure-claude.py --check` antes de alterar a configuração. Quando a configuração da integração estiver autorizada, use `--apply`, que faz backup e preserva a statusline existente com um wrapper. Não substitua `statusLine` manualmente. O cache fica em `~/Library/Application Support/PlanMeter/claude-statusline.json`. Não abra uma sessão de modelo para forçar sua atualização.
 
 **Z.ai:** oriente o usuário a cadastrar a chave no prompt seguro de Configurações → Contas. Não peça a chave no chat e não a passe por comandos, argumentos, ambiente ou configuração. A chave pertence ao Keychain do usuário. Em segundo plano, Keychain bloqueado significa dados indisponíveis, sem prompt de desbloqueio.
 
@@ -35,3 +35,7 @@ Não remova quarentena, desative o Gatekeeper ou prometa notarização. O aplica
 ## Encerrar
 
 Informe o que foi verificado, o que depende de atividade normal do Claude Code e qualquer autenticação que o usuário ainda precise concluir. Preserve histórico, preferências, cache e chaves. Publicação, push, compras, alterações de planos e mudanças em credenciais exigem autorização própria.
+
+## Insights e teste de edições
+
+A instalação não autoriza gerar insights reais. Use fixtures em `./scripts/test.sh`. Smokes por modelo precisam de pedido específico, pois podem consumir quota. `PLANMETER_DEVELOPMENT=1` inclui a simulação Free/Pro sem compra. Não apresente simulação como licença Apple nem transação verificada.

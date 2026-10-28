@@ -12,12 +12,19 @@ final class GrokMonitor: NSObject {
     private(set) var message: String?
     private(set) var paused = false
     var schedule = GrokSchedule(manual:.distantPast,automatic:.distantPast)
+    var automaticInterval:TimeInterval=900
+    func setRefreshInterval(_ value:TimeInterval) {
+        let previous=automaticInterval;automaticInterval=value
+        schedule.automatic=max(schedule.manual,schedule.automatic.addingTimeInterval(value-previous))
+        save(schedule,to:scheduleFile)
+    }
+    var audit:(AuditAction,AuditOutcome)->Void={_,_ in}
     private var timer: Timer?, client: GrokClient?, generation = 0
     var errorText: String? {
         guard let reading = reading else { return grokStatus("pending") }
         return reading.status == "ok" ? nil : grokStatus(reading.status)
     }
-    var stale: Bool { errorText != nil || snapshot == nil || Date().timeIntervalSince(snapshot!.queriedAt) > 960 }
+    var stale: Bool { errorText != nil || snapshot == nil || Date().timeIntervalSince(snapshot!.queriedAt) > automaticInterval+60 }
     private var cacheFile: URL { cacheDirectory.appendingPathComponent("grok-quota.json") }
     private var scheduleFile: URL { cacheDirectory.appendingPathComponent("grok-schedule.json") }
     @discardableResult private func save<T:Encodable>(_ value: T, to path: URL) -> Bool {
@@ -63,16 +70,17 @@ final class GrokMonitor: NSObject {
             return
         }
         guard manual || now >= schedule.automatic else {return}
-        schedule=GrokSchedule(manual:now.addingTimeInterval(60),automatic:now.addingTimeInterval(900))
+        schedule=GrokSchedule(manual:now.addingTimeInterval(60),automatic:now.addingTimeInterval(automaticInterval))
         guard save(schedule,to:scheduleFile) else { onChange();return }
         busy=true;requests += 1;generation += 1;let token=generation
         message="Grok: consultando quota…"
-        let request=clientFactory();client=request;onChange()
+        let request=clientFactory();client=request;audit(.query,.started);onChange()
         DispatchQueue.global(qos:.utility).async {
             let result=Result {try request.read()}
             DispatchQueue.main.async { [weak self] in
                 guard let self=self,self.generation==token else {return}
                 self.busy=false;self.client=nil
+                self.audit(.query,(try? result.get()).map{$0.status == "ok"} == true ? .success : .failure)
                 switch result {
                 case .success(let value):
                     self.reading=value

@@ -17,6 +17,8 @@ for line in sys.stdin:
         result = {}
     elif method == 'account/read':
         result = {'account': {'type': 'apiKey' if mode == 'wrong-account' else 'chatgpt'}}
+    elif method == 'model/list':
+        result = {'data': [{'id': 'fixture-model'}, {'id': 'fixture-model'}], 'nextCursor': None}
     elif method == 'account/rateLimits/read':
         if mode == 'rpc-error':
             print(json.dumps({'id': msg['id'], 'error': {'code': -1, 'message': 'not forwarded'}}), flush=True)

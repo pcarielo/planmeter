@@ -50,6 +50,10 @@ final class ZaiClient: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate 
             } else { envelope["status"] = "unavailable" }
             let result = try parseZai(JSONSerialization.data(withJSONObject: envelope))
             if result.status == "ok" && result.snapshot.remaining == nil { throw QuotaError.message("Z.ai não informou percentuais reconhecidos") }
+            if result.status=="ok" {
+                var snapshot=result.snapshot;snapshot.credentialScope=quotaCredentialScope(provider:"zai",key:key)
+                return ZaiReading(snapshot:snapshot,status:result.status,retryAfter:result.retryAfter,nextAttemptAt:result.nextAttemptAt)
+            }
             return result
         } catch { throw QuotaError.message("Consulta Z.ai falhou; confira rede, chave e plano. Nenhum detalhe privado foi registrado.") }
     }
