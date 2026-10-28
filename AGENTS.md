@@ -21,3 +21,16 @@
 - Grok usa o Grok Build oficial autenticado, via ACP: somente `initialize` e `_x.ai/billing`. Não leia auth.json, cookies ou tokens, não use `session/new`/`session/prompt` e não substitua quota compartilhada por créditos financeiros da API. Testes usam CLI fictício e recusam solicitações de ferramentas do servidor.
 
 - Insights são uma ação separada da coleta de quotas. Leia `docs/insights.md`: geração somente por ação explícita, com o modelo e o cliente escolhidos pelo usuário, resumo agregado e ferramentas desativadas. A assinatura Claude usa apenas o cliente oficial. Testes reais exigem autorização própria; os testes padrão usam fixtures.
+
+## Cursor Cloud specific instructions
+
+O aplicativo é Swift/AppKit. `./scripts/build.sh`, `./scripts/install.sh` e `./scripts/test.sh` exigem macOS e Xcode Command Line Tools. Neste Linux, não compile nem instale o aplicativo e não consulte provedores reais.
+
+A validação com fixtures que roda aqui usa Python 3 e Node.js 18 ou posterior, já presentes na imagem:
+
+- `./scripts/doctor.sh` faz o diagnóstico somente por leitura.
+- `python3 tests/test_install.py` cobre instalação, item de login e desinstalação com comandos fictícios.
+- `node tests/test_connect_proxy.js` sobe o gateway CONNECT local e confirma a recusa de hosts e endereços privados.
+- `python3 tests/test_claude_integration.py` passa nos casos que usam os scripts do repositório. `test_bundled_setup_works_from_unrelated_directory` exige `build/PlanMeter.app` gerado no macOS.
+
+Não há serviço de longa duração para iniciar.
