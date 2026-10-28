@@ -66,9 +66,9 @@ Novos app/InsightRunner.swift, app/HarnessDiscovery.swift e adaptadores pequenos
 - [x] Executar scripts/test.sh e doctor.sh, isolamento UI, scanner de segredos e revisão Perry com fontes minimizadas. R4 fechou os seis achados R3; nota final de documentação incorporada.
 - [x] Atualizar README, guias de segurança/provedores, changelog e documentação de uso Free/Pro/insights.
 - [x] Inspecionar interface com fixtures e capturas sem dados reais.
-- [ ] Instalar só depois de validar assinatura/destino e preservar rollback, histórico e autenticação.
-- [ ] Verificar uma instância, refresh real, logs, seleção Free/Pro e insight no aplicativo instalado.
-- [ ] Auditar cada requisito acima antes de concluir a meta. Publicação App Store fora do escopo; Git requer autorização específica.
+- [x] Instalar só depois de validar assinatura/destino e preservar rollback, histórico e autenticação.
+- [x] Verificar uma instância, refresh real, logs, seleção Free/Pro e insight no aplicativo instalado.
+- [x] Auditar cada requisito acima antes de concluir a meta. Publicação App Store fora do escopo; Git requer autorização específica.
 
 ## Fontes verificadas
 - https://raw.githubusercontent.com/omacom/omarchy/quattro/bin/omarchy-agent-usage-claude
@@ -85,4 +85,4 @@ Novos app/InsightRunner.swift, app/HarnessDiscovery.swift e adaptadores pequenos
 
 ## Estado da implementação
 
-Candidata 1.6.0 em validação local. Os detalhes operacionais e os resultados de cada execução ficam no registro privado da instalação. A conclusão depende da revisão final, da validação do aplicativo instalado e dos consentimentos de acesso. Publicação na App Store permanece fora do escopo.
+Versão 1.6.0 publicada e instalada em 28/10/2026. Testes locais e CI em macOS 14 e 15 aprovados. Consulta Claude pelo cliente oficial validada; revisão independente concluída. Instalação única, assinatura, rollback, preservação de preferências e histórico conferidos. Os modos Free/Pro e a geração de insight no aplicativo instalado foram confirmados pelo usuário. Os detalhes operacionais ficam no registro privado da instalação. Publicação na App Store e compras reais permanecem fora do escopo.
