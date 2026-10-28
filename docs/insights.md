@@ -44,13 +44,13 @@ Grok pode participar do resumo de métricas, mas ainda não é oferecido como ge
 
 ## Dados usados e limites da previsão
 
-O PlanMeter mantém observações dos últimos sete dias. Medidas que mudam são guardadas; valores repetidos recebem uma amostra a cada 30 minutos. As gravações são agrupadas e executadas fora da interface.
+O PlanMeter mantém observações dos últimos sete dias. Medidas que mudam são guardadas; valores repetidos recebem uma amostra a cada 30 minutos. As gravações são agrupadas e executadas fora da interface. Ao iniciar, o aplicativo também recupera leituras com data e saldo que já estavam nos registros dos detectores, sem duplicá-las. O histórico de períodos e renovações entra como contexto separado; uma renovação, sozinha, não vira uma amostra de consumo.
 
 A projeção compara medidas da mesma janela e da mesma conta identificada. Para Z.ai e Kimi, também pode usar a continuidade da configuração de chave gerenciada pelo aplicativo. A continuidade usa um resumo SHA-256 da chave efetivamente utilizada na consulta (verificador, não cifra), guardado só em arquivos privados, sem guardar seu valor no histórico. Trocar a chave separa as sequências. O marcador não é enviado ao modelo. Essa continuidade local não é apresentada como uma identidade de conta fornecida pelo serviço.
 
-Um reset não é consumo negativo. Intervalos longos sem observações não são tratados como cobertura contínua. O cálculo precisa de pelo menos uma hora coberta e três observações comparáveis. Se faltarem dados, identificação ou data de renovação, a resposta deve explicar essa limitação.
+Um reset não é consumo negativo. Intervalos longos sem observações não são tratados como cobertura contínua. O cálculo precisa de pelo menos uma hora coberta e três observações comparáveis. Quando não há base para projetar o ritmo, o insight aproveita o saldo, o calendário e as mudanças efetivamente observadas. Ele não inventa uma previsão nem repete diagnósticos negativos para cada provedor. O tom deve ser cordial, direto e proporcional aos dados.
 
-O modelo recebe **um resumo agregado de todos os planos ativos**, inclusive de serviços diferentes do provedor escolhido para gerar o insight, além do horário atual e do fuso horário local. O PlanMeter não inclui no prompt chaves, tokens, emails, identificadores completos de conta, transcrições ou arquivos de projetos. Os clientes podem acrescentar suas próprias instruções e metadados de execução. O ritmo e a estimativa de esgotamento são calculados localmente; o modelo os explica em uma ou duas linhas.
+O modelo recebe **um resumo agregado de todos os planos ativos**, inclusive de serviços diferentes do provedor escolhido para gerar o insight, além do horário atual e do fuso horário local. O PlanMeter não inclui no prompt chaves, tokens, emails, identificadores completos de conta, transcrições ou arquivos de projetos. Os clientes podem acrescentar suas próprias instruções e metadados de execução. Contadores de períodos representam o histórico local, sem somar registros de outras contas ou sem identificação aos de uma conta identificada. O ritmo e a estimativa de esgotamento são calculados localmente; o modelo os explica em uma ou duas linhas.
 
 Quando as métricas mudam, uma janela renova ou a resposta completa uma hora, o painel informa que é preciso gerar outro insight. A estimativa não garante disponibilidade futura.
 
@@ -69,6 +69,6 @@ Os testes de política e interface usam fixtures. Eles não comprovam uma transa
 
 ## Validação dos adaptadores
 
-Os seis harnesses foram exercitados no macOS com uma entrada fictícia sem histórico. O resultado esperado foi informar que faltavam observações, em uma ou duas linhas. Esses testes comprovam a execução nessas instalações, não uma previsão sobre sete dias de uso real nem compatibilidade com todas as versões futuras.
+Os seis harnesses foram exercitados no macOS com dados fictícios. O resultado esperado é uma resposta curta com saldos, observações históricas e próximos prazos, conforme os dados fornecidos. Não se exige que o texto repita diagnósticos de falta de dados. Esses testes comprovam a execução nas instalações verificadas; não representam uma previsão sobre sete dias de uso real nem garantem compatibilidade com versões futuras.
 
 As versões verificadas foram Codex CLI 0.162.0, Claude Code 2.1.312, Kimi Code 2.3.3, OpenCode 1.19.0, pi 1.4.0 e Prime Agent 0.10.1. O cálculo de risco e o tratamento de resets são testados separadamente com sete dias de dados sintéticos.

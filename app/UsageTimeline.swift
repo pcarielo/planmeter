@@ -22,6 +22,10 @@ struct UsageProjection:Codable {
     let riskBeforeReset:Bool?
     var identityEvidence:String="provider"
     var reason:String?=nil
+    var historyPeriodCount:Int=0
+    var confirmedRenewalCount:Int=0
+    var periodFirstObservedRemainingPercent:Double?=nil
+    var periodObservedHours:Double?=nil
 }
 struct UsageTimeline:Codable {
     private(set) var samples:[UsageSample]=[]
@@ -45,7 +49,29 @@ struct UsageTimeline:Codable {
         let before=samples.count;samples.removeAll{$0.observed<cutoff}
         return changed || before != samples.count
     }
-    func projections(for snapshot:QuotaSnapshot,now:Date=Date(),maximumGap:TimeInterval=3600,connectionID:String?=nil)->[UsageProjection] {
+    @discardableResult mutating func restoreRecordedObservations(_ states:[String:ResetState],now:Date=Date())->Bool {
+        var restored=UsageTimeline()
+        var snapshots:[QuotaSnapshot]=[]
+        for (provider,state) in states {
+            var recorded=state.transitions.flatMap {[$0.previous,$0.current]}
+            if let baseline=state.baseline {recorded.append(baseline)}
+            for event in state.history {
+                var value=QuotaSnapshot(queriedAt:event.detectedAt,windows:[QuotaWindow(name:event.window,remaining:100-event.usedPercent,durationMinutes:event.durationMinutes,reset:event.serviceResetAt)])
+                value.provider=event.provider ?? provider;value.identityFingerprint=event.identityFingerprint;value.bucketID=event.bucketID
+                recorded.append(value)
+            }
+            for var value in recorded {if value.provider==nil {value.provider=provider};snapshots.append(value)}
+        }
+        for value in snapshots.sorted(by:{$0.queriedAt<$1.queriedAt}) {_=restored.ingest(value,now:now,connectionID:value.credentialScope)}
+        let original=samples
+        for value in restored.samples {
+            let duplicate=samples.contains {$0.provider==value.provider && $0.account==value.account && $0.window==value.window && $0.durationMinutes==value.durationMinutes && abs($0.observed-value.observed)<0.001}
+            if !duplicate {samples.append(value)}
+        }
+        samples.sort {$0.observed<$1.observed}
+        return original != samples
+    }
+    func projections(for snapshot:QuotaSnapshot,now:Date=Date(),maximumGap:TimeInterval=3600,connectionID:String?=nil,renewals:[RenewalEntry]=[])->[UsageProjection] {
         let end=now.timeIntervalSince1970,cutoff=end-Self.retention
         guard snapshot.queriedAt.timeIntervalSince1970.isFinite,snapshot.queriedAt.timeIntervalSince1970<=end+5 else{return []}
         return snapshot.windows.compactMap { window in
@@ -69,7 +95,17 @@ struct UsageTimeline:Codable {
             let risk:Bool?
             if let reset=reset {risk=remaining==0 ? true : exhaustion.map{$0<reset} ?? (rate==0 ? false : nil)} else {risk=nil}
             let reason:String? = snapshot.identityFingerprint==nil && connectionID==nil ? "account_unidentified" : reset==nil ? "reset_unavailable" : rate==nil ? "insufficient_coverage" : nil
-            return UsageProjection(provider:snapshot.effectiveProvider,window:quotaWindowLabel(window),remaining:remaining,observedAt:snapshot.queriedAt.timeIntervalSince1970,resetAt:window.reset,observedHours:seconds/3600,sampleCount:rows.count,percentPerHour:rate,estimatedExhaustionAt:exhaustion,riskBeforeReset:risk,identityEvidence:snapshot.identityFingerprint != nil ? "provider" : connectionID != nil ? "local_credential_configuration" : "unknown",reason:reason)
+            let periods=renewals.filter {entry in
+                entry.provider==snapshot.effectiveProvider && entry.minutes==window.durationMinutes && entry.window==quotaWindowLabel(window) && entry.startedAt>=cutoff && entry.startedAt<=end && entry.identity==snapshot.identityFingerprint
+            }
+            let firstInPeriod:UsageSample?
+            if snapshot.identityFingerprint != nil || connectionID != nil {
+                firstInPeriod=rows.first {row in
+                guard let recordedReset=row.reset,let currentReset=window.reset else{return false}
+                return abs(recordedReset-currentReset)<60 && row.observed<snapshot.queriedAt.timeIntervalSince1970-60
+                }
+            } else {firstInPeriod=nil}
+            return UsageProjection(provider:snapshot.effectiveProvider,window:quotaWindowLabel(window),remaining:remaining,observedAt:snapshot.queriedAt.timeIntervalSince1970,resetAt:window.reset,observedHours:seconds/3600,sampleCount:rows.count,percentPerHour:rate,estimatedExhaustionAt:exhaustion,riskBeforeReset:risk,identityEvidence:snapshot.identityFingerprint != nil ? "provider" : connectionID != nil ? "local_credential_configuration" : "unknown",reason:reason,historyPeriodCount:periods.count,confirmedRenewalCount:periods.filter(\.detectedBetweenReadings).count,periodFirstObservedRemainingPercent:firstInPeriod?.remaining,periodObservedHours:firstInPeriod.map{(snapshot.queriedAt.timeIntervalSince1970-$0.observed)/3600})
         }
     }
 }
@@ -134,5 +170,35 @@ func runUsageTimelineTests() {
     check(labels==["Semanal","5 horas"],"insight describes actual durations instead of provider-internal primary and secondary names")
     let encoded=String(data:try! JSONEncoder().encode(timeline.projections(for:codex,now:now)),encoding:.utf8)!
     check(!encoded.contains("primary") && !encoded.contains("secondary"),"model payload does not require guessing window semantics")
+    var restored=UsageTimeline()
+    _=restored.ingest(snap(0,40),now:now)
+    var state=ResetState();state.transitions=[ResetTransition(previous:snap(-3600,80),current:snap(-1800,60),confirmed:false)]
+    check(restored.restoreRecordedObservations(["claude":state],now:now),"older recorded observations are recovered even after a newer sample")
+    check(restored.samples.count==3 && restored.projections(for:snap(0,40),now:now)[0].percentPerHour==40,"restored observations contribute to measured pace")
+    check(!restored.restoreRecordedObservations(["claude":state],now:now),"history recovery is idempotent")
+    let period=RenewalEntry(provider:"claude",bucket:"fixture",identity:"one",window:"5 horas",minutes:300,startedAt:now.timeIntervalSince1970-7200,endsAt:now.timeIntervalSince1970+10000,recordedAt:now,detectedBetweenReadings:true)
+    let context=UsageTimeline().projections(for:snap(0,40),now:now,renewals:[period])[0]
+    check(context.historyPeriodCount==1 && context.confirmedRenewalCount==1 && context.sampleCount==0 && context.percentPerHour==nil,"renewal history is visible without inventing usage measurements")
+    var unidentified=UsageTimeline()
+    _=unidentified.ingest(first,now:now);_=unidentified.ingest(second,now:now);_=unidentified.ingest(third,now:now)
+    check(unidentified.samples.count==3 && unidentified.projections(for:third,now:now)[0].periodFirstObservedRemainingPercent==nil,"unidentified rows cannot provide a cross-account balance comparison")
+    state.baseline=snap(-1200,55,-1000)
+    state.history=[ResetRecord(id:"fixture",provider:"claude",identityFingerprint:"one",bucketID:"fixture",window:"5h",durationMinutes:300,detectedAt:now.addingTimeInterval(-900),previousServiceResetAt:now.timeIntervalSince1970-1000,serviceResetAt:now.timeIntervalSince1970+10000,previousUsedPercent:99,usedPercent:11)]
+    _=restored.restoreRecordedObservations(["claude":state],now:now)
+    check(restored.samples.contains{$0.observed==now.timeIntervalSince1970-1200 && $0.remaining==55},"baseline restored with original observation time")
+    check(restored.samples.contains{$0.observed==now.timeIntervalSince1970-900 && $0.remaining==89},"event restores current usedPercent, never previousUsedPercent")
+    check(!restored.samples.contains{$0.remaining==1},"untimed previous utilization is never reconstructed")
+    check(!restored.restoreRecordedObservations(["claude":state],now:now),"baseline and event backfill also remain idempotent")
+    var unknownPeriod=period;unknownPeriod.id="unknown";unknownPeriod.identity=nil
+    var otherPeriod=period;otherPeriod.id="other";otherPeriod.identity="other"
+    check(UsageTimeline().projections(for:snap(0,40),now:now,renewals:[period,unknownPeriod,otherPeriod])[0].historyPeriodCount==1,"known account does not inherit unknown or other-account periods")
+    check(UsageTimeline().projections(for:third,now:now,renewals:[period,unknownPeriod,otherPeriod])[0].historyPeriodCount==1,"unidentified snapshot does not inherit identified account periods")
+    var countOnly=context;countOnly.historyPeriodCount += 1;countOnly.confirmedRenewalCount += 1
+    var encodedCounts=try! JSONSerialization.jsonObject(with:JSONEncoder().encode(countOnly)) as! [String:Any]
+    encodedCounts["sampleCount"]=30
+    countOnly=try! JSONDecoder().decode(UsageProjection.self,from:JSONSerialization.data(withJSONObject:encodedCounts))
+    check(InsightBasis.signature([context])==InsightBasis.signature([countOnly]),"counts alone do not invalidate a still-current insight")
+    var changedReference=context;changedReference.periodFirstObservedRemainingPercent=80
+    check(InsightBasis.signature([context]) != InsightBasis.signature([changedReference]),"changed historical reference invalidates the previous insight")
     print("PASS Usage timeline: \(count) checks")
 }

@@ -49,5 +49,14 @@ func runPlanAccessUITests() {
     check(app.dashboard.cards.count==3,"pro shows third selected plan")
     app.planAccess.isPro=false;app.updateDashboard()
     check(app.dashboard.cards.isEmpty && app.zaiSnapshot != nil,"downgrade does not delete cache")
+    app.planAccess.selected=["codex","grok"]
+    app.claudeError="Unselected Claude error";app.zaiRefreshMessage="Unselected Zai error";app.zaiBusy=false
+    app.dashboard.refreshMessage="Previous unselected messages"
+    app.updateDashboard()
+    check(!app.dashboard.refreshMessage.contains("Unselected") && !app.dashboard.refreshMessage.contains("Claude") && !app.dashboard.refreshMessage.contains("Kimi"),"banner ignores unselected provider messages")
+    app.zaiBusy=true;app.updateDashboard()
+    check(app.dashboard.refreshEnabled,"unselected busy provider does not disable refresh")
+    app.planAccess.selected=["zai"];app.updateDashboard()
+    check(app.dashboard.refreshEnabled,"selected Zai retains its manual refresh queue while busy")
     print("PASS Plan access UI: \(count) checks; no StoreKit purchase or provider requests")
 }

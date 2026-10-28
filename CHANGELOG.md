@@ -1,5 +1,11 @@
 # Alterações
 
+## 1.6.1 - 2026-10-28
+
+- A faixa de atualização mostra apenas mensagens dos planos selecionados, inclusive no modo Free.
+- Insights reaproveitam leituras antigas com horário registrado e consideram o histórico de períodos e renovações.
+- Respostas usam percentuais explícitos, mudanças observadas e orientação direta, sem transformar diagnósticos internos em avisos de autenticação.
+
 ## 1.6.0 - 2026-10-28
 
 - Intervalo de atualização configurável e logs privados com rotação e retenção mínima de três meses.
