@@ -15,13 +15,15 @@ Na migração, até dois provedores conhecidos são preservados. Se houver mais,
 ## Configurar um insight
 
 1. Abra **Configurações → Insights**.
-2. Escolha o plano que fornecerá o modelo. O harness próprio é sugerido quando existe uma integração correspondente.
-3. Use **Buscar modelos no harness** ou informe o identificador do modelo.
+2. Escolha o provedor que fornecerá o modelo. Essa escolha é independente dos planos selecionados para monitoramento: você pode, por exemplo, usar Kimi pelo pi para analisar Codex e Grok. Um cliente já escolhido é preservado se for compatível; caso contrário, o cliente próprio é sugerido.
+3. Use **Buscar modelos no harness** ou informe o identificador do modelo. A busca filtra pelo provedor escolhido. Se o pi estiver configurado para Kimi Coding e o provedor selecionado for Codex, o catálogo pode ficar vazio; escolha Kimi Code para ver os modelos dessa rota.
 4. Confira o executável encontrado. Para usar outra instalação do mesmo harness, preencha o caminho alternativo.
 5. Aplique as opções e use **Verificar conexão**.
 6. No painel de disponibilidade, clique em **Gerar insight**.
 
 Os caminhos são procurados no `PATH`, em diretórios comuns de instalação e nas variáveis opcionais `PLANMETER_CODEX_PATH`, `PLANMETER_CLAUDE_PATH`, `PLANMETER_KIMI_PATH`, `PLANMETER_OPENCODE_PATH`, `PLANMETER_PI_PATH` e `PLANMETER_PRIME_AGENT_PATH`. Essas variáveis contêm somente caminhos. Não coloque credenciais nelas.
+
+A lista mostra todos os clientes suportados. Os incompatíveis com o provedor selecionado aparecem desabilitados, com indicação dos provedores que aceitam. Um catálogo encontrado não comprova autenticação; use Verificar conexão. Alterações no modelo ou caminho precisam ser aplicadas.
 
 O programa não executa o shell para interpretar um caminho. Um caminho alternativo inválido produz erro, sem trocar silenciosamente para outra instalação.
 

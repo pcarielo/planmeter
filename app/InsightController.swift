@@ -53,8 +53,9 @@ final class InsightController {
             }
             return
         }
-        guard let request=InsightModelCatalog.request(harness:preferences.harness,executable:path) else{onChange();return}
-        let selectedHarness=preferences.harness
+        guard InsightHarness.compatible(with:preferences.provider).contains(preferences.harness) else{message="Este cliente não é compatível com o provedor escolhido.";onChange();return}
+        guard let request=InsightModelCatalog.request(harness:preferences.harness,executable:path) else{message="Claude Code usa os aliases oferecidos pelo cliente oficial. Selecione um modelo e aplique as opções.";onChange();return}
+        let selectedHarness=preferences.harness,selectedProvider=preferences.provider
         let adapter=InsightAdapter(preferences:preferences,executable:path,inheritedEnvironment:[:])
         guard let provider=(selectedHarness == .opencode ? adapter.openCodeProvider : adapter.piProvider) else{return}
         busy=true;generation += 1;let token=generation;let runner=InsightRunner(timeout:15);worker=runner;message="Buscando modelos no harness…";onChange()
@@ -64,8 +65,10 @@ final class InsightController {
                 guard let self=self,self.generation==token else{return}
                 self.busy=false;self.worker=nil
                 switch result {
-                case .success(let data):self.models=selectedHarness == .kimi ? InsightModelCatalog.kimiModels(data) : selectedHarness == .opencode ? InsightModelCatalog.openCodeModels(data,provider:provider) : InsightModelCatalog.piModels(data,provider:provider);self.message=self.models.isEmpty ? "Nenhum modelo desse plano encontrado no harness." : "Selecione um modelo e verifique a conexão."
-                case .failure:self.message="Não foi possível consultar o catálogo local."
+                case .success(let data):
+                    self.models=selectedHarness == .kimi ? InsightModelCatalog.kimiModels(data) : selectedHarness == .opencode ? InsightModelCatalog.openCodeModels(data,provider:provider) : InsightModelCatalog.piModels(data,provider:provider)
+                    self.message=InsightModelCatalog.resultMessage(models:self.models,data:data,harness:selectedHarness,provider:selectedProvider)
+                case .failure:self.models=[];self.message="Não foi possível consultar o catálogo local."
                 }
                 self.onChange()
             }

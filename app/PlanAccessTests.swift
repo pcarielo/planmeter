@@ -58,5 +58,13 @@ func runPlanAccessUITests() {
     check(app.dashboard.refreshEnabled,"unselected busy provider does not disable refresh")
     app.planAccess.selected=["zai"];app.updateDashboard()
     check(app.dashboard.refreshEnabled,"selected Zai retains its manual refresh queue while busy")
+    app.planAccess.selected=["codex","grok"];app.planAccess.isPro=true;app.syncInsightSettings()
+    check(app.settingsWindow.model.insightProviders.contains("kimi") && !app.allowed("kimi"),"generator provider is independent of monitored quotas")
+    var applied=InsightPreferences();applied.provider="codex";applied.harness = .pi
+    app.insights.configure(applied,discovery:HarnessDiscovery(home:"/fixture",environment:[:],executable:{_ in false}))
+    var draft=applied;draft.provider="kimi"
+    app.settingsWindow.model.configureInsight(draft);app.settingsWindow.model.insightModels=["draft-kimi"]
+    app.syncInsightSettings()
+    check(app.settingsWindow.model.insightModels==["draft-kimi"],"result for an old applied provider does not overwrite the draft catalog")
     print("PASS Plan access UI: \(count) checks; no StoreKit purchase or provider requests")
 }

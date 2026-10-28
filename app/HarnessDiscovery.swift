@@ -4,6 +4,11 @@ enum InsightHarness:String,CaseIterable,Codable {
     case codex,claude,kimi,opencode,pi,primeAgent="prime-agent"
     var title:String {switch self {case .codex:return "Codex";case .claude:return "Claude Code";case .kimi:return "Kimi Code";case .opencode:return "OpenCode";case .pi:return "pi";case .primeAgent:return "Prime Agent"}}
     var pathVariable:String {"PLANMETER_"+rawValue.replacingOccurrences(of:"-",with:"_").uppercased()+"_PATH"}
+    static let modelProviders=["codex","claude","kimi","zai"]
+    static func providerTitle(_ key:String)->String {
+        ["codex":"Codex","claude":"Claude Code","kimi":"Kimi Code","zai":"Z.ai"][key] ?? key
+    }
+    var compatibleProviderNames:String {Self.modelProviders.filter{Self.compatible(with:$0).contains(self)}.map{Self.providerTitle($0)}.joined(separator:" / ")}
     static func compatible(with provider:String)->[Self] {
         switch provider {case "codex":return [.codex,.opencode,.pi];case "claude":return [.claude];case "kimi":return [.kimi,.opencode,.pi,.primeAgent];case "zai":return [.opencode,.pi,.primeAgent];default:return []}
     }
@@ -16,6 +21,7 @@ struct InsightPreferences:Codable,Equatable {
     var model=""
     var harness=InsightHarness.codex
     var executablePath=""
+    func sameCatalog(as other:Self)->Bool {provider==other.provider && harness==other.harness && executablePath==other.executablePath}
 }
 struct HarnessDiscovery {
     let home:String
