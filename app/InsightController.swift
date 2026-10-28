@@ -76,6 +76,7 @@ final class InsightController {
         guard !busy else{return}
         guard permitted else{message="Insights estão disponíveis no Pro com um plano conectado.";onChange();return}
         guard !projections.isEmpty else{message="Atualize as quotas para gerar o insight.";onChange();return}
+        guard !InsightAnalysis.signals(projections).isEmpty else{message=InsightAnalysis.waitingMessage;onChange();return}
         guard Date()>=nextGeneration else{message="Aguarde um minuto entre gerações.";onChange();return}
         execute(projections:projections)
     }
@@ -101,7 +102,7 @@ final class InsightController {
                 switch result {
                 case .success(let answer):
                     self.connected=true
-                    if let answer=answer {self.text=answer;self.generatedAt=Date();self.basis=projections ?? [];self.message="Estimativa baseada nas observações disponíveis dos últimos 7 dias."}
+                    if let answer=answer {self.text=answer;self.generatedAt=Date();self.basis=projections ?? [];self.message="Análise baseada nas observações disponíveis dos últimos 7 dias."}
                     else {self.message=[InsightHarness.kimi,.primeAgent,.opencode].contains(adapter.preferences.harness) ? "Configuração encontrada no cliente; a conexão será confirmada na geração." : "Conexão verificada pelo harness."}
                 case .failure(let error):self.connected=false;self.message=(error as? InsightFailure)?.message ?? "Não foi possível gerar o insight."
                 }
@@ -117,8 +118,19 @@ struct InsightBasis {
         return signature(basis) != signature(current)
     }
     static func signature(_ values:[UsageProjection])->[String] {
-        values.map {value in
-            [value.provider,value.window,String(value.remaining),value.resetAt.map{String($0)} ?? "none",value.percentPerHour.map{String($0)} ?? "none",value.riskBeforeReset.map{String($0)} ?? "none",value.reason ?? "valid",value.periodFirstObservedRemainingPercent.map{String($0)} ?? "none"].joined(separator:"|")
+        values.map {value -> String in
+            func number(_ input:Double?)->String {input.map{String($0)} ?? "none"}
+            var fields:[String]=[value.provider,value.window,String(value.remaining)]
+            fields.append(number(value.resetAt))
+            fields.append(number(value.percentPerHour))
+            fields.append(value.riskBeforeReset.map{$0 ? "true" : "false"} ?? "none")
+            fields.append(value.reason ?? "valid")
+            fields.append(number(value.recentPercentPerHour))
+            fields.append(number(value.baselinePercentPerHour))
+            fields.append(number(value.periodFirstObservedRemainingPercent))
+            fields.append(number(value.historicalCalendarPercentPerHour))
+            fields.append(number(value.calendarPercentPerHour))
+            return fields.joined(separator:"|")
         }.sorted()
     }
 }

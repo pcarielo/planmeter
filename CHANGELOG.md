@@ -1,5 +1,10 @@
 # Alterações
 
+## Em desenvolvimento: 1.7.0
+
+- Insights interpretam ritmo recente, comparação histórica, risco de esgotamento e margem projetada, com cálculos locais e sem chamadas ao modelo quando não há sinal analítico.
+- Cartões mostram uma ação no hover e permitem atualizar um único provedor sem fechar o painel, com indicação de consulta e espera.
+
 ## 1.6.1 - 2026-10-28
 
 - A faixa de atualização mostra apenas mensagens dos planos selecionados, inclusive no modo Free.

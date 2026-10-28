@@ -108,14 +108,14 @@ struct InsightAdapter {
             return InsightRequest(executable:executable,arguments:arguments,environment:environment,input:Data(),resources:["insight-agent.md":Data(agent.utf8)],resourceDirectories:["skills"])
         case .primeAgent:
             guard ["kimi","zai"].contains(preferences.provider),let provider=piProvider,let state=environment["PRIME_AGENT_CODING_AGENT_DIR"] else{throw InsightFailure.invalidConfiguration}
-            let instruction="{\"task\":\"Responda somente ao resumo de quotas enviado, em uma ou duas linhas curtas em português. Não execute Python, ferramentas ou comandos; não inclua rodapés.\"}"
+            let instruction="{\"task\":\"Interprete somente os sinais analíticos enviados, em uma ou duas linhas curtas em português. Não execute Python, ferramentas ou comandos; não inclua rodapés.\"}"
             arguments=["--print","--mode","text","--no-session","--no-skills","--no-prompt-templates","--no-themes","--no-context-files","--offline","--provider",provider,"--model",preferences.model,"--thinking","off","--system-prompt",instruction]
             return InsightRequest(executable:executable,arguments:arguments,environment:environment,input:prompt,blockChildExecution:true,writableDirectories:[state],proxyHosts:InsightProxy.hosts(for:preferences.provider))
         case .codex:
             guard preferences.provider=="codex" else{throw InsightFailure.invalidConfiguration}
             var args=["exec","--ignore-user-config","--ignore-rules","--ephemeral","--skip-git-repo-check","--json","--color","never","--model",preferences.model]
             for config in ["approval_policy=\"never\"","default_permissions=\"planmeter\"","permissions.planmeter.filesystem={\":minimal\"=\"read\",\":workspace_roots\"=\"read\"}","permissions.planmeter.network.enabled=false","web_search=\"disabled\"","features.shell_tool=false","features.hooks=false","features.multi_agent=false","features.goals=false","features.memories=false","features.remote_plugin=false","features.apps=false","features.skill_mcp_dependency_install=false","apps._default.enabled=false","tools.view_image=false","project_doc_max_bytes=0","analytics.enabled=false"] {args += ["-c",config]}
-            let instruction=String(data:try JSONEncoder().encode("{\"task\":\"Retorne somente um objeto JSON com summary: uma ou duas linhas curtas sobre as quotas fornecidas. Não inclua rodapé de status, assinatura, data de execução ou informações pessoais. Não use ferramentas.\"}"),encoding:.utf8)!
+            let instruction=String(data:try JSONEncoder().encode("{\"task\":\"Retorne somente um objeto JSON com summary: uma ou duas linhas curtas interpretando os sinais analíticos fornecidos. Não inclua rodapé de status, assinatura, data de execução ou informações pessoais. Não use ferramentas.\"}"),encoding:.utf8)!
             args += ["-c","developer_instructions="+instruction,"--output-schema","@planmeter:insight-schema.json","-"]
             let schema=Data(#"{"type":"object","properties":{"summary":{"type":"string","maxLength":440}},"required":["summary"],"additionalProperties":false}"#.utf8)
             return InsightRequest(executable:executable,arguments:args,environment:environment,input:prompt,resources:["insight-schema.json":schema])

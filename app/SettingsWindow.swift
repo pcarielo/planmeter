@@ -176,7 +176,7 @@ private struct SettingsRootView: View {
                     Button("Aplicar opções"){model.onInsightChange(model.insight)}
                     Button("Verificar conexão"){model.onInsightCheck()}.disabled(model.insightBusy || !model.insightPro)
                     Text(model.insightMessage).foregroundColor(.secondary)
-                    Text("Confirme a conta no cliente escolhido; ela pode ser diferente da conta monitorada. O provedor recebe um resumo agregado de todos os planos ativos. Não são enviados chaves, transcrições ou arquivos dos seus projetos. A resposta é uma estimativa, não uma garantia.").font(.system(size:13)).foregroundColor(.secondary)
+                    Text("Confirme a conta no cliente escolhido; ela pode ser diferente da conta monitorada. O provedor recebe sinais analíticos calculados sobre os planos ativos. Não são enviados chaves, transcrições ou arquivos dos seus projetos. A resposta é uma estimativa, não uma garantia.").font(.system(size:13)).foregroundColor(.secondary)
                 }.disabled(!model.insightPro)
             }.formStyle(.grouped).tabItem{Label("Insights",systemImage:"sparkles")}.tag("insights")
             Form {
@@ -202,7 +202,7 @@ private struct SettingsRootView: View {
                 Text("PlanMeter").font(.largeTitle.bold())
                 Text("Desenvolvido por Paulo Carielo").font(.system(size:16))
                 Text("Versão " + (Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "local"))
-                Text("Quotas e histórico locais. Chaves no Keychain. Insights opcionais enviam um resumo ao modelo escolhido.").multilineTextAlignment(.center).foregroundColor(.secondary)
+                Text("Quotas e histórico locais. Chaves no Keychain. Insights opcionais enviam sinais analíticos ao modelo escolhido.").multilineTextAlignment(.center).foregroundColor(.secondary)
                 Link("Privacidade e segurança",destination:URL(string:"https://github.com/pcarielo/planmeter/blob/main/docs/security.md")!)
                 Link("Suporte e código-fonte",destination:URL(string:"https://github.com/pcarielo/planmeter")!)
             }.padding(44).tabItem{Label("Sobre",systemImage:"info.circle")}.tag("about")
