@@ -71,7 +71,12 @@ final class QuotaDashboardView: NSView {
             let freshness = card.detail.map {", "+$0} ?? ""
             return card.name + freshness + ": " + windows.joined(separator:", ")
         }
-        setAccessibilityLabel("Quotas disponíveis. " + summaries.joined(separator:". ") + (insightStatus.map{". Insight: "+(insight ?? "Ainda não gerado")+". "+$0} ?? ""))
+        var accessibility="Quotas disponíveis. " + summaries.joined(separator:". ")
+        if let status=insightStatus {
+            let text=insight ?? "Ainda não gerado"
+            accessibility += ". Insight: \(text). \(status)"
+        }
+        setAccessibilityLabel(accessibility)
     }
     required init?(coder:NSCoder) { fatalError("init(coder:) not supported") }
     override func mouseDown(with event:NSEvent) { dismiss() }
