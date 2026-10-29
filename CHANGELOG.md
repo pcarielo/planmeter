@@ -1,6 +1,6 @@
 # Alterações
 
-## Em desenvolvimento: 1.7.0
+## 1.7.0 - 2026-10-29
 
 - O gerador de insights é independente dos planos monitorados; a seleção explica compatibilidade, filtros de catálogo e alterações pendentes.
 
