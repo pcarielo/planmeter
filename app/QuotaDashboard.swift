@@ -25,6 +25,7 @@ final class QuotaDashboardView: NSView {
     let columns: Int
     let insight:String?
     let insightStatus:String?
+    var onCardRefresh:(String)->Void={_ in}
     var onInsight:()->Void={}
     var onInsightSettings:()->Void={}
     private var insightButton:NSButton?
@@ -37,11 +38,11 @@ final class QuotaDashboardView: NSView {
     static func cardFrames(_ cards:[QuotaCard],width:CGFloat)->[NSRect] {
         let columns=width < 500 ? 1 : 2
         let cardWidth=(width-40-CGFloat(columns-1)*12)/CGFloat(columns)
-        var nextY=Array(repeating:CGFloat(76),count:columns)
+        var nextY=Array(repeating:CGFloat(98),count:columns)
         return cards.enumerated().map {index,card in
             let column=index % columns
             let rect=NSRect(x:20+CGFloat(column)*(cardWidth+12),y:nextY[column],width:cardWidth,height:cardHeight(card))
-            nextY[column]=rect.maxY+12
+            nextY[column]=rect.maxY+34
             return rect
         }
     }
@@ -50,9 +51,9 @@ final class QuotaDashboardView: NSView {
     }
     static func insightHeight(_ text:String?,status:String?,width:CGFloat)->CGFloat {
         guard let status=status else{return 0}
-        return max(160,64+max(40,insightTextHeight(text ?? "Escolha um modelo conectado e gere uma análise do uso.",width:width,size:14))+8+max(18,insightTextHeight(status,width:width,size:10))+16)
+        return max(160,64+max(40,insightTextHeight(text ?? "A análise aparece aqui quando houver um sinal útil no histórico.",width:width,size:14))+8+max(18,insightTextHeight(status,width:width,size:10))+16)
     }
-    init(cards: [QuotaCard], width: CGFloat,insight:String?=nil,insightStatus:String?=nil,insightBusy:Bool=false,insightEnabled:Bool=true) {
+    init(cards: [QuotaCard], width: CGFloat,insight:String?=nil,insightStatus:String?=nil,insightBusy:Bool=false,insightEnabled:Bool=true,refreshStates:[String:CardRefreshStatus]=[:]) {
         self.insight=insight;self.insightStatus=insightStatus
         self.cards=cards;columns=width < 500 ? 1 : 2
         let bottom=Self.cardFrames(cards,width:width).map(\.maxY).max() ?? 112
@@ -61,6 +62,12 @@ final class QuotaDashboardView: NSView {
             let button=NSButton(title:insightBusy ? "Gerando…" : "Gerar insight",target:self,action:#selector(generateInsight))
             button.frame=NSRect(x:width-148,y:bottom+24,width:128,height:26);button.bezelStyle = .rounded;button.isEnabled = !insightBusy && insightEnabled;addSubview(button);insightButton=button
             let settings=NSButton(title:"Configurar",target:self,action:#selector(configureInsight));settings.frame=NSRect(x:width-260,y:bottom+24,width:106,height:26);settings.bezelStyle = .rounded;addSubview(settings)
+        }
+        for (card,rect) in zip(cards,Self.cardFrames(cards,width:width)) {
+            let frame=NSRect(x:rect.minX,y:rect.minY-22,width:rect.width,height:rect.height+22)
+            let button=CardRefreshControl(provider:card.key,name:card.name,frame:frame,status:refreshStates[card.key] ?? CardRefreshStatus())
+            button.onRefresh={[weak self] key in self?.onCardRefresh(key)}
+            addSubview(button)
         }
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
@@ -112,16 +119,16 @@ final class QuotaDashboardView: NSView {
         }
         if let message=insightStatus {
             let bottom=Self.cardFrames(cards,width:bounds.width).map(\.maxY).max() ?? 112
-            let textHeight=max(40,Self.insightTextHeight(insight ?? "Escolha um modelo conectado e gere uma análise do uso.",width:bounds.width,size:14))
+            let textHeight=max(40,Self.insightTextHeight(insight ?? "A análise aparece aqui quando houver um sinal útil no histórico.",width:bounds.width,size:14))
             let statusHeight=max(18,Self.insightTextHeight(message,width:bounds.width,size:10))
             let rect=NSRect(x:20,y:bottom+12,width:bounds.width-40,height:Self.insightHeight(insight,status:message,width:bounds.width)-12)
             NSColor.controlBackgroundColor.setFill();NSBezierPath(roundedRect:rect,xRadius:12,yRadius:12).fill()
             text("Insight · últimos 7 dias",NSRect(x:34,y:bottom+28,width:bounds.width-300,height:22),14,.labelColor,.semibold)
             let paragraph=NSMutableParagraphStyle();paragraph.lineBreakMode = .byWordWrapping
-            ((insight ?? "Escolha um modelo conectado e gere uma análise do uso.") as NSString).draw(in:NSRect(x:34,y:bottom+64,width:bounds.width-68,height:textHeight),withAttributes:[.font:NSFont.systemFont(ofSize:14),.foregroundColor:NSColor.labelColor,.paragraphStyle:paragraph])
+            ((insight ?? "A análise aparece aqui quando houver um sinal útil no histórico.") as NSString).draw(in:NSRect(x:34,y:bottom+64,width:bounds.width-68,height:textHeight),withAttributes:[.font:NSFont.systemFont(ofSize:14),.foregroundColor:NSColor.labelColor,.paragraphStyle:paragraph])
             (message as NSString).draw(in:NSRect(x:34,y:bottom+64+textHeight+8,width:bounds.width-68,height:statusHeight),withAttributes:[.font:NSFont.systemFont(ofSize:10),.foregroundColor:NSColor.secondaryLabelColor,.paragraphStyle:paragraph])
         }
-        text(pinned ? "Fixado · arraste a faixa superior para mover" : "Clique no conteúdo para fechar",NSRect(x:20,y:bounds.height-26,width:bounds.width-40,height:18),10,.secondaryLabelColor)
+        text(pinned ? "Fixado · arraste a faixa superior para mover" : "Clique fora dos cartões para fechar",NSRect(x:20,y:bounds.height-26,width:bounds.width-40,height:18),10,.secondaryLabelColor)
     }
 }
 
@@ -130,13 +137,21 @@ final class QuotaDashboardHeader: NSView {
     override func mouseDown(with event:NSEvent) { if pinned {window?.performDrag(with:event)} }
 }
 
+final class QuotaDashboardPanel:NSPanel {
+    override var canBecomeKey:Bool {true}
+    override var canBecomeMain:Bool {false}
+}
+
 final class QuotaDashboard: NSObject {
     private(set) var panel: NSPanel?
     private var timer: Timer?, localMonitor: Any?, globalMonitor: Any?
+    private var requestedCards=Set<String>()
     private(set) var pinned=false
     private(set) var scale:CGFloat=1
     private var headerHeight:CGFloat=64
     var onRefresh: () -> Void = {}
+    var onCardRefresh:(String)->Void={_ in}
+    var cardRefreshStates:[String:CardRefreshStatus]=[:]
     var onAccess: () -> Void = {}
     var onOptionsChanged:(Double,Bool)->Void={_,_ in}
     var autoCloseSeconds:TimeInterval=15
@@ -155,8 +170,8 @@ final class QuotaDashboard: NSObject {
     }
     func show(anchor:NSRect,screen:NSScreen,timeout:TimeInterval?=nil) {
         tearDown()
-        let panel=NSPanel(contentRect:NSRect(x:anchor.maxX-600,y:anchor.minY-300,width:600,height:300),styleMask:[.borderless,.nonactivatingPanel],backing:.buffered,defer:false)
-        panel.isReleasedWhenClosed=false;panel.level = .floating;panel.hasShadow=true
+        let panel=QuotaDashboardPanel(contentRect:NSRect(x:anchor.maxX-600,y:anchor.minY-300,width:600,height:300),styleMask:[.borderless,.nonactivatingPanel],backing:.buffered,defer:false)
+        panel.isReleasedWhenClosed=false;panel.becomesKeyOnlyIfNeeded=true;panel.level = .floating;panel.hasShadow=true
         panel.sharingType = .readOnly
         panel.backgroundColor = .windowBackgroundColor;panel.isOpaque=false;panel.hidesOnDeactivate=false
         panel.collectionBehavior=[.canJoinAllSpaces,.fullScreenAuxiliary,.transient]
@@ -179,11 +194,23 @@ final class QuotaDashboard: NSObject {
         }
         armTimer(timeout)
     }
-    func update() { if let panel=panel,let screen=panel.screen ?? NSScreen.main {render(screen:screen,top:NSPoint(x:panel.frame.minX,y:panel.frame.maxY))} }
+    func update() {
+        let hadRequest = !requestedCards.isEmpty
+        requestedCards=requestedCards.filter{cardRefreshStates[$0]?.busy==true}
+        if !requestedCards.isEmpty {timer?.invalidate();timer=nil}
+        else if hadRequest {armTimer()}
+        if let panel=panel,let screen=panel.screen ?? NSScreen.main {render(screen:screen,top:NSPoint(x:panel.frame.minX,y:panel.frame.maxY))}
+    }
+    private func requestCard(_ key:String) {
+        guard cardRefreshStates[key]?.enabled()==true else{return}
+        requestedCards.insert(key);onCardRefresh(key);update();armTimer()
+    }
     private func render(screen:NSScreen,top:NSPoint) {
         guard let panel=panel else{return}
+        let focusedProvider=(panel.firstResponder as? CardRefreshControl)?.provider
         let area=screen.visibleFrame,width=min(600*scale,area.width-24)
-        let view=QuotaDashboardView(cards:QuotaCard.available(cards),width:width/scale,insight:insight,insightStatus:insightStatus,insightBusy:insightBusy,insightEnabled:insightEnabled)
+        let view=QuotaDashboardView(cards:QuotaCard.available(cards),width:width/scale,insight:insight,insightStatus:insightStatus,insightBusy:insightBusy,insightEnabled:insightEnabled,refreshStates:cardRefreshStates)
+        view.onCardRefresh={[weak self] key in self?.requestCard(key)}
         view.onInsight=onInsight;view.onInsightSettings=onInsightSettings
         view.pinned=pinned
         let logical=view.bounds;view.setFrameSize(NSSize(width:logical.width*scale,height:logical.height*scale));view.bounds=logical
@@ -204,15 +231,16 @@ final class QuotaDashboard: NSObject {
         sizes.frame=NSRect(x:width<530 ? 14 : 210,y:width<530 ? 8 : 31,width:165,height:26);sizes.selectedSegment=scale==1 ? 0 : scale==1.25 ? 1 : 2;header.addSubview(sizes)
         _=button("Configurações",width<530 ? 210 : 385,130,#selector(openAccess))
         _=button("×",width-46,32,#selector(dismissPanel))
-        let message=NSTextField(labelWithString:refreshMessage.isEmpty ? (pinned ? "Fixado · arraste esta faixa para mover" : "Fecha em \(Int(autoCloseSeconds))s · clique no conteúdo para fechar") : refreshMessage)
+        let message=NSTextField(labelWithString:refreshMessage.isEmpty ? (pinned ? "Fixado · arraste esta faixa para mover" : "Fecha em \(Int(autoCloseSeconds))s · clique fora dos cartões para fechar") : refreshMessage)
         message.frame=NSRect(x:width<530 ? 190 : 16,y:8,width:width-(width<530 ? 206 : 32),height:17);message.font = .systemFont(ofSize:10);message.textColor = .secondaryLabelColor;message.lineBreakMode = .byTruncatingTail;header.addSubview(message)
         let scroll=NSScrollView(frame:NSRect(x:0,y:0,width:width,height:height-headerHeight));scroll.drawsBackground=false;scroll.hasVerticalScroller=view.frame.height>height-headerHeight
         scroll.documentView=view;view.dismiss = {[weak self] in if self?.pinned == false {self?.close()}}
         content.addSubview(scroll);content.addSubview(header);panel.contentView=content
+        if let key=focusedProvider,let button=view.subviews.compactMap({$0 as? CardRefreshControl}).first(where:{$0.provider==key}) {panel.makeFirstResponder(button)}
     }
     func armTimer(_ seconds:TimeInterval?=nil) {
         timer?.invalidate();timer=nil
-        guard isVisible,!pinned else{return}
+        guard isVisible,!pinned,requestedCards.isEmpty else{return}
         let next=Timer(timeInterval:seconds ?? autoCloseSeconds,repeats:false){[weak self] _ in self?.close()}
         RunLoop.main.add(next,forMode:.common);timer=next
     }
@@ -233,6 +261,7 @@ final class QuotaDashboard: NSObject {
         if wasPinned {onOptionsChanged(Double(scale),false)}
     }
     private func tearDown() {
+        requestedCards.removeAll()
         timer?.invalidate();timer=nil
         if let monitor=localMonitor {NSEvent.removeMonitor(monitor)};localMonitor=nil
         if let monitor=globalMonitor {NSEvent.removeMonitor(monitor)};globalMonitor=nil
@@ -256,7 +285,7 @@ func runQuotaDashboardTests() {
     let compact=[cards[0],QuotaCard(key:"other",name:"Other",snapshot:zero,stale:false),cards[0]]
     let frames=QuotaDashboardView.cardFrames(compact,width:600)
     check(frames[1].height<frames[0].height,"card height follows own content")
-    check(frames[2].minY==frames[0].maxY+12,"columns stack without shared row whitespace")
+    check(frames[2].minY==frames[0].maxY+34,"columns stack without shared row whitespace")
     check(QuotaCard.windowLabel(QuotaWindow(name:"Uso MCP (janela não informada)",remaining:100,durationMinutes:nil,reset:nil))=="MCP","MCP label stays short")
     guard let screen=NSScreen.main else {fatalError("screen required")}
     let dashboard=QuotaDashboard();dashboard.cards=cards
@@ -264,6 +293,7 @@ func runQuotaDashboardTests() {
     dashboard.show(anchor:anchor,screen:screen,timeout:0.05)
     check(dashboard.isVisible,"panel shown")
     check(dashboard.panel?.sharingType == .readOnly,"panel allows capture")
+    check(dashboard.panel?.canBecomeKey==true && dashboard.panel?.canBecomeMain==false,"cards can receive keyboard focus without becoming the main window")
     let end=Date().addingTimeInterval(3);while dashboard.isVisible && Date()<end {RunLoop.current.run(until:Date().addingTimeInterval(0.02))}
     check(!dashboard.isVisible,"auto dismiss")
     dashboard.show(anchor:anchor,screen:screen);dashboard.close();check(!dashboard.isVisible,"click dismissal cleanup")
@@ -296,13 +326,46 @@ func runQuotaDashboardTests() {
         let stamp=Date()
         let sample=QuotaSnapshot(queriedAt:stamp,windows:[QuotaWindow(name:"5h",remaining:65,durationMinutes:300,reset:stamp.addingTimeInterval(7200).timeIntervalSince1970),QuotaWindow(name:"weekly",remaining:80,durationMinutes:10080,reset:stamp.addingTimeInterval(3*86400).timeIntervalSince1970)])
         let demoCards=["codex","claude","zai","kimi"].map{QuotaCard(key:$0,name:$0.capitalized,snapshot:sample,stale:false)}
-        let demo=QuotaDashboardView(cards:demoCards,width:600,insight:"O ritmo observado está estável. A janela de 5 horas merece atenção antes da próxima renovação.",insightStatus:"Fixture: 7 dias completos de observações")
+        let demo=QuotaDashboardView(cards:demoCards,width:600,insight:"No ritmo recente, a janela de 5 horas do Codex pode esgotar antes de renovar. Reduzir o consumo em cerca de 19% preservaria saldo até lá.",insightStatus:"Fixture: 7 dias completos de observações")
         let window=NSWindow(contentRect:demo.bounds,styleMask:[.borderless],backing:.buffered,defer:false)
         window.isReleasedWhenClosed=false;window.contentView=demo
         captureFixturePreview(demo,name:"insight-dashboard")
+        demo.subviews.compactMap{$0 as? CardRefreshControl}.first?.setHovered(true)
+        captureFixturePreview(demo,name:"card-refresh-hover")
         window.close()
     }
     let longInsight=String(repeating:"Consumo observado ",count:24)
     check(QuotaDashboardView.insightHeight(longInsight,status:"Gerado em data fictícia\nDados mudaram; gere um novo insight.",width:600)>160,"long accepted insight grows instead of clipping")
+    dashboard.show(anchor:anchor,screen:screen)
+    var cardTargets:[String]=[];dashboard.onCardRefresh={cardTargets.append($0)}
+    dashboard.cardRefreshStates=["codex":CardRefreshStatus()];dashboard.update()
+    let scroll=dashboard.panel?.contentView?.subviews.compactMap{$0 as? NSScrollView}.first
+    let cardButton=scroll?.documentView?.subviews.compactMap{$0 as? CardRefreshControl}.first
+    let originalFrame=cardButton?.frame;cardButton?.setHovered(true)
+    check(cardButton?.hovered==true && cardButton?.frame==originalFrame,"hover highlights without layout shift")
+    cardButton?.performClick(nil)
+    check(cardTargets==["codex"] && dashboard.isVisible && !dashboard.pinned,"card click routes one provider without closing transient panel")
+    dashboard.cardRefreshStates=["codex":CardRefreshStatus(busy:true)];dashboard.update()
+    let busyScroll=dashboard.panel?.contentView?.subviews.compactMap{$0 as? NSScrollView}.first
+    let busyButton=busyScroll?.documentView?.subviews.compactMap{$0 as? CardRefreshControl}.first
+    check(busyButton?.isEnabled==false,"busy card prevents duplicate requests")
+    dashboard.close()
+    dashboard.cardRefreshStates=["codex":CardRefreshStatus(busy:true)]
+    dashboard.show(anchor:anchor,screen:screen,timeout:0.05)
+    let automaticDeadline=Date().addingTimeInterval(3)
+    while dashboard.isVisible && Date()<automaticDeadline {RunLoop.current.run(until:Date().addingTimeInterval(0.02))}
+    check(!dashboard.isVisible,"automatic provider activity does not override the dismissal timer")
+    dashboard.cardRefreshStates=["codex":CardRefreshStatus()]
+    dashboard.onCardRefresh={key in dashboard.cardRefreshStates[key]=CardRefreshStatus(busy:true)}
+    dashboard.show(anchor:anchor,screen:screen,timeout:0.05)
+    let holdScroll=dashboard.panel?.contentView?.subviews.compactMap{$0 as? NSScrollView}.first
+    holdScroll?.documentView?.subviews.compactMap{$0 as? CardRefreshControl}.first?.performClick(nil)
+    RunLoop.current.run(until:Date().addingTimeInterval(0.1))
+    check(dashboard.isVisible,"manual card query keeps transient panel open until completion")
+    dashboard.cardRefreshStates=["codex":CardRefreshStatus()];dashboard.update();dashboard.armTimer(0.05)
+    let completionDeadline=Date().addingTimeInterval(3)
+    while dashboard.isVisible && Date()<completionDeadline {RunLoop.current.run(until:Date().addingTimeInterval(0.02))}
+    check(!dashboard.isVisible,"manual completion restores dismissal")
+    dashboard.onCardRefresh={_ in}
     print("PASS quota dashboard: \(count) checks; synthetic data only")
 }

@@ -55,13 +55,14 @@ func runInsightRunnerTests() {
     }
     check((try? InsightText.validate("riskBeforeReset é true"))==nil,"internal field names never reach the user")
     let clock=Date(timeIntervalSince1970:1800000000)
-    let projected=UsageProjection(provider:"codex",window:"Semanal",remaining:10,observedAt:clock.timeIntervalSince1970,resetAt:clock.timeIntervalSince1970+7200,observedHours:24,sampleCount:49,percentPerHour:10,estimatedExhaustionAt:clock.timeIntervalSince1970+3600,riskBeforeReset:true,identityEvidence:"unknown",reason:"account_unidentified")
+    var projected=UsageProjection(provider:"codex",window:"Semanal",remaining:10,observedAt:clock.timeIntervalSince1970,resetAt:clock.timeIntervalSince1970+7200,observedHours:24,sampleCount:49,percentPerHour:10,estimatedExhaustionAt:clock.timeIntervalSince1970+3600,riskBeforeReset:true,identityEvidence:"unknown",reason:"account_unidentified")
+    projected.recentPercentPerHour=10
     let payload=try! JSONSerialization.jsonObject(with:InsightText.prompt([projected],now:clock,timeZone:TimeZone(identifier:"America/Fortaleza")!)) as! [String:Any]
-    let row=(payload["projections"] as! [[String:Any]])[0]
-    check((try? InsightText.validate("A data é resetDateLocal, 3 de novembro."))==nil,"new internal date field cannot leak into prose")
-    check(row["reason"]==nil && row["identityEvidence"]==nil && row["remainingPercent"] as? Double==10,"model receives useful percentage facts without internal authentication diagnostics")
-    check(row["hoursUntilReset"] as? Double==2 && row["hoursUntilExhaustion"] as? Double==1,"relative hours are calculated locally")
-    check((row["resetLocal"] as? String)?.hasSuffix("-03:00")==true && payload["timeZone"] as? String=="America/Fortaleza","model receives explicit local timezone")
+    let signals=payload["signals"] as! [[String:Any]]
+    check(signals.first?["kind"] as? String=="depletion_risk","model receives a computed interpretation instead of card facts")
+    check(payload["projections"]==nil,"ordinary balances and dates are not sent for paraphrasing")
+    let signalText=String(data:try! JSONSerialization.data(withJSONObject:payload),encoding:.utf8)!
+    check(!signalText.contains("account_unidentified") && !signalText.contains("1800000000"),"internal diagnostics and epochs do not leak into analytical prompt")
     write("printf '{\"error\":\"node_version\"}\\n'\n")
     let nodes=InsightProxy.nodeCandidates(environment:ProcessInfo.processInfo.environment,home:FileManager.default.homeDirectoryForCurrentUser.path)
     guard let node=nodes.first(where:{FileManager.default.isExecutableFile(atPath:$0)}) else{fatalError("Node fixture required")}

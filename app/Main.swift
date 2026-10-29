@@ -23,7 +23,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func allowed(_ provider:String)->Bool {planAccess.active.contains(provider)}
     func visible(_ value:QuotaSnapshot?,_ provider:String)->QuotaSnapshot? {allowed(provider) ? value : nil}
     func applyPlanAccess() {
-        if !planAccess.insightsAllowed || !allowed(insights.preferences.provider) {insights.cancel()}
+        if !planAccess.insightsAllowed {insights.cancel()}
         syncInsightSettings()
         if !allowed("codex") {timer?.invalidate();client?.cancel()}
         if !allowed("claude") {claudeTimer?.invalidate();claudeQuota.stop()}
@@ -277,9 +277,12 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func syncInsightSettings() {
         let model=settingsWindow.model
-        model.insightPro=planAccess.isPro;model.insightBusy=insights.busy;model.insightModels=insights.models
-        model.insightMessage=insights.message;model.insightPath=insights.executable ?? ""
-        model.insightProviders=planAccess.active.intersection(["codex","claude","kimi","zai"]).sorted()
+        model.insightPro=planAccess.isPro;model.insightBusy=insights.busy;model.insightApplied=insights.preferences
+        if model.insight.sameCatalog(as:insights.preferences) {
+            model.insightModels=insights.models;model.insightPath=insights.executable ?? ""
+            if model.insight==insights.preferences {model.insightMessage=insights.message}
+        }
+        model.insightProviders=InsightHarness.modelProviders
     }
     func currentInsightProjections()->[UsageProjection] {
         let values:[(String,QuotaSnapshot?,Bool)]=[
@@ -289,13 +292,31 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func generateInsight() {
         guard !timelineWriteBlocked else{settingsWindow.model.insightMessage="O histórico de uso precisa ser recuperado antes de gerar insights.";return}
-        insights.generate(currentInsightProjections(),permitted:planAccess.insightsAllowed && allowed(insights.preferences.provider))
+        insights.generate(currentInsightProjections(),permitted:planAccess.insightsAllowed && InsightHarness.modelProviders.contains(insights.preferences.provider))
+    }
+    func cardRefreshStatuses()->[String:CardRefreshStatus] {
+        let paused=activity.suspended
+        let states:[String:CardRefreshStatus]=[
+            "codex":CardRefreshStatus(busy:policy.busy,paused:paused),
+            "claude":CardRefreshStatus(busy:claudeQuota.busy,nextAllowedAt:claudeQuota.enabled ? claudeQuota.nextManualRefreshAt : .distantPast,paused:paused,actionTitle:claudeQuota.enabled ? "Atualizar agora" : "Reler dados locais"),
+            "zai":CardRefreshStatus(busy:zaiBusy,nextAllowedAt:zaiManualCooldown,paused:paused),
+            "kimi":CardRefreshStatus(busy:kimi.busy,nextAllowedAt:kimi.schedule.manual,paused:paused),
+            "grok":CardRefreshStatus(busy:grok.busy,nextAllowedAt:grok.schedule.manual,paused:paused)]
+        return states.filter{allowed($0.key)}
+    }
+    func refreshCard(_ provider:String) {
+        let actions:[String:()->Void]=[
+            "codex":{self.refresh()},"claude":{self.refreshClaude(manual:true)},
+            "zai":{self.refreshZaiNow()},"kimi":{self.kimi.refreshNow()},"grok":{self.grok.refreshNow()}]
+        _=CardRefreshRouting.request(provider,selected:planAccess.active,states:cardRefreshStatuses(),actions:actions)
     }
     func updateDashboard() {
+        dashboard.cardRefreshStates=cardRefreshStatuses()
+        dashboard.onCardRefresh={[weak self] key in self?.refreshCard(key)}
         dashboard.insight=planAccess.isPro ? insights.text : nil
         dashboard.insightStatus=planAccess.isPro ? (timelineWriteBlocked ? "Histórico de uso indisponível; arquivo original preservado para recuperação." : insights.status(current:currentInsightProjections())) : nil
         dashboard.insightBusy=insights.busy
-        dashboard.insightEnabled=planAccess.isPro && allowed(insights.preferences.provider) && !timelineWriteBlocked
+        dashboard.insightEnabled=planAccess.isPro && InsightHarness.modelProviders.contains(insights.preferences.provider) && !timelineWriteBlocked
         dashboard.onInsight = {[weak self] in self?.generateInsight()}
         dashboard.onInsightSettings = {[weak self] in self?.showSettings(page:"insights")}
         dashboard.cards = [
@@ -389,13 +410,14 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         var draft=insights.preferences
         if !model.insightProviders.contains(draft.provider) {draft.provider="";draft.model=""}
         model.configureInsight(draft)
+        syncInsightSettings()
         model.onInsightChange = {[weak self] value in self?.configureInsight(value)}
         model.onInsightModels = {[weak self] in
             guard let self=self,self.planAccess.isPro else{return}
             self.configureInsight(self.settingsWindow.model.insight);self.insights.discoverModels()
         }
         model.onInsightCheck = {[weak self] in
-            guard let self=self,self.planAccess.isPro,self.allowed(self.settingsWindow.model.insight.provider) else{return}
+            guard let self=self,self.planAccess.isPro,InsightHarness.modelProviders.contains(self.settingsWindow.model.insight.provider) else{return}
             self.configureInsight(self.settingsWindow.model.insight);self.insights.checkConnection()
         }
         model.licenseMessage=licenseStore.message;model.licensePrice=licenseStore.price;model.licenseBusy=licenseStore.busy
@@ -809,7 +831,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             fputs("Testes AppKit exigem pacote isolado. Use python3 tests/run-ui-tests.py.\n", stderr)
             exit(2)
         }
-        if CommandLine.arguments.contains("--self-test") { runClaudeCLIProbeTests();runClaudeCLIParserTests();runLicenseTests();runUsagePersistenceTests();runInsightModelTests();runInsightAdapterTests();runInsightRunnerTests();runHarnessDiscoveryTests();runPlanAccessTests();runUsageTimelineTests();runProviderRefreshTests();runOperationsTests();runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests();runCredentialPolicyTests();runGrokTests(); runLocalClientTests(); return }
+        if CommandLine.arguments.contains("--self-test") { runClaudeCLIProbeTests();runClaudeCLIParserTests();runLicenseTests();runUsagePersistenceTests();runInsightModelTests();runInsightAdapterTests();runInsightRunnerTests();runHarnessDiscoveryTests();runPlanAccessTests();runUsageTimelineTests();runInsightAnalysisTests();runCardRefreshRoutingTests();runProviderRefreshTests();runOperationsTests();runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests();runCredentialPolicyTests();runGrokTests(); runLocalClientTests(); return }
         if CommandLine.arguments.contains("--confetti-self-test") { runConfettiTests(); return }
         if CommandLine.arguments.contains("--loop-self-test") { runLoopTests(); return }
         if CommandLine.arguments.contains("--ui-self-test") {

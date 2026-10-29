@@ -17,6 +17,7 @@ final class ClaudeQuotaMonitor {
     private var timer:Timer?
     private var generation=0
     private var manualAfter=Date.distantPast
+    var nextManualRefreshAt:Date {manualAfter}
     private var automaticAfter=Date.distantPast
     var interval:TimeInterval=900
     func setRefreshInterval(_ value:TimeInterval) {

@@ -26,6 +26,12 @@ struct UsageProjection:Codable {
     var confirmedRenewalCount:Int=0
     var periodFirstObservedRemainingPercent:Double?=nil
     var periodObservedHours:Double?=nil
+    var recentPercentPerHour:Double?=nil
+    var baselinePercentPerHour:Double?=nil
+    var historicalCalendarPercentPerHour:Double?=nil
+    var historicalCalendarHours:Double=0
+    var calendarPercentPerHour:Double?=nil
+    var calendarHours:Double=0
 }
 struct UsageTimeline:Codable {
     private(set) var samples:[UsageSample]=[]
@@ -71,21 +77,74 @@ struct UsageTimeline:Codable {
         samples.sort {$0.observed<$1.observed}
         return original != samples
     }
-    func projections(for snapshot:QuotaSnapshot,now:Date=Date(),maximumGap:TimeInterval=3600,connectionID:String?=nil,renewals:[RenewalEntry]=[])->[UsageProjection] {
+    private static func completeDays(_ rows:[UsageSample],end:UsageSample,maximumGap:TimeInterval)->(Double,Double)? {
+        guard let first=rows.first,end.observed>first.observed else{return nil}
+        let days=min(7,Int((end.observed-first.observed)/86400))
+        guard days>=1 else{return nil}
+        for count in stride(from:days,through:1,by:-1) {
+            let target=end.observed-Double(count)*86400
+            guard let anchor=rows.last(where:{$0.observed<=target && target-$0.observed<=min(3600,maximumGap)}),
+                  (0...100).contains(anchor.remaining),(0...100).contains(end.remaining),anchor.remaining>=end.remaining else{continue}
+            return (end.observed-anchor.observed,anchor.remaining-end.remaining)
+        }
+        return nil
+    }
+    func projections(for snapshot:QuotaSnapshot,now:Date=Date(),maximumGap:TimeInterval=3600,connectionID:String?=nil,renewals:[RenewalEntry]=[],calendar:Calendar = .current)->[UsageProjection] {
         let end=now.timeIntervalSince1970,cutoff=end-Self.retention
         guard snapshot.queriedAt.timeIntervalSince1970.isFinite,snapshot.queriedAt.timeIntervalSince1970<=end+5 else{return []}
         return snapshot.windows.compactMap { window in
             guard let remaining=window.remaining,remaining.isFinite,(0...100).contains(remaining) else{return nil}
             let rows=samples.filter{$0.provider==snapshot.effectiveProvider && $0.account==(snapshot.identityFingerprint ?? connectionID) && $0.window==window.name && $0.durationMinutes==window.durationMinutes && $0.observed>=cutoff && $0.observed<=min(end+5,snapshot.queriedAt.timeIntervalSince1970+0.001)}.sorted{$0.observed<$1.observed}
             var seconds=0.0,consumed=0.0,pairs=0
+            var recentSeconds=0.0,recentConsumed=0.0,recentPairs=0
+            var priorSeconds=0.0,priorConsumed=0.0,priorPairs=0
+            let recentStart=snapshot.queriedAt.timeIntervalSince1970-6*3600
+            let historyBands=(1...6).compactMap {day -> (Int,Double,Double)? in
+                guard let start=calendar.date(byAdding:.day,value:-day,to:Date(timeIntervalSince1970:recentStart)),let end=calendar.date(byAdding:.day,value:-day,to:snapshot.queriedAt) else{return nil}
+                return (day,start.timeIntervalSince1970,end.timeIntervalSince1970)
+            }
+            var matchedDays=Set<Int>()
             for (a,b) in zip(rows,rows.dropFirst()) {
                 let gap=b.observed-a.observed
                 guard gap>0,gap<=maximumGap,a.reset != nil,b.reset != nil,
                       abs(a.reset!-b.reset!)<60,b.remaining<=a.remaining else{continue}
                 seconds += gap;consumed += a.remaining-b.remaining;pairs += 1
+                if a.observed>=recentStart {recentSeconds += gap;recentConsumed += a.remaining-b.remaining;recentPairs += 1}
+                else if let band=historyBands.first(where:{a.observed >= $0.1 && b.observed <= $0.2}) {
+                    priorSeconds += gap;priorConsumed += a.remaining-b.remaining;priorPairs += 1;matchedDays.insert(band.0)
+                }
             }
             // At least one hour and three comparable observations are required for a pace.
             let rate=(snapshot.identityFingerprint != nil || connectionID != nil) && seconds>=3600 && pairs>=2 ? consumed/(seconds/3600) : nil
+            let identified=snapshot.identityFingerprint != nil || connectionID != nil
+            let recentRate=identified && recentSeconds>=3600 && recentPairs>=2 ? recentConsumed/(recentSeconds/3600) : nil
+            let priorRate=identified && priorSeconds>=3600 && priorPairs>=2 && matchedDays.count>=2 ? priorConsumed/(priorSeconds/3600) : nil
+            var historyClockSeconds=0.0,historyClockConsumed=0.0
+            if identified {
+                let currentPeriodFirst=rows.first {row in
+                    guard let reset=row.reset,let currentReset=window.reset else{return false}
+                    return abs(reset-currentReset)<60
+                }?.observed ?? snapshot.queriedAt.timeIntervalSince1970
+                let periods=Dictionary(grouping:rows.filter {row in
+                    guard let reset=row.reset,reset.isFinite,let currentReset=window.reset else{return false}
+                    return abs(reset-currentReset)>=60
+                },by:{$0.reset!})
+                for period in periods.values {
+                    let ordered=period.sorted{$0.observed<$1.observed}
+                    guard let last=ordered.last,last.observed<currentPeriodFirst,
+                          let interval=Self.completeDays(ordered,end:last,maximumGap:maximumGap) else{continue}
+                    historyClockSeconds += interval.0
+                    historyClockConsumed += interval.1
+                }
+            }
+            let historyClockRate=historyClockSeconds>=86400 ? historyClockConsumed/(historyClockSeconds/3600) : nil
+            let currentRows=rows.filter {row in
+                guard let recordedReset=row.reset,let currentReset=window.reset else{return false}
+                return abs(recordedReset-currentReset)<60
+            }
+            let endpoint=UsageSample(provider:snapshot.effectiveProvider,account:snapshot.identityFingerprint ?? connectionID,window:window.name,durationMinutes:window.durationMinutes,observed:snapshot.queriedAt.timeIntervalSince1970,reset:window.reset,remaining:remaining)
+            let currentClock=identified ? Self.completeDays(currentRows,end:endpoint,maximumGap:maximumGap) : nil
+            let currentClockRate=currentClock.map{$0.1/($0.0/3600)}
             let exhaustion=rate.flatMap {rate->Double? in
                 guard rate>0 else{return nil}
                 let date=snapshot.queriedAt.timeIntervalSince1970+remaining/rate*3600
@@ -105,7 +164,7 @@ struct UsageTimeline:Codable {
                 return abs(recordedReset-currentReset)<60 && row.observed<snapshot.queriedAt.timeIntervalSince1970-60
                 }
             } else {firstInPeriod=nil}
-            return UsageProjection(provider:snapshot.effectiveProvider,window:quotaWindowLabel(window),remaining:remaining,observedAt:snapshot.queriedAt.timeIntervalSince1970,resetAt:window.reset,observedHours:seconds/3600,sampleCount:rows.count,percentPerHour:rate,estimatedExhaustionAt:exhaustion,riskBeforeReset:risk,identityEvidence:snapshot.identityFingerprint != nil ? "provider" : connectionID != nil ? "local_credential_configuration" : "unknown",reason:reason,historyPeriodCount:periods.count,confirmedRenewalCount:periods.filter(\.detectedBetweenReadings).count,periodFirstObservedRemainingPercent:firstInPeriod?.remaining,periodObservedHours:firstInPeriod.map{(snapshot.queriedAt.timeIntervalSince1970-$0.observed)/3600})
+            return UsageProjection(provider:snapshot.effectiveProvider,window:quotaWindowLabel(window),remaining:remaining,observedAt:snapshot.queriedAt.timeIntervalSince1970,resetAt:window.reset,observedHours:seconds/3600,sampleCount:rows.count,percentPerHour:rate,estimatedExhaustionAt:exhaustion,riskBeforeReset:risk,identityEvidence:snapshot.identityFingerprint != nil ? "provider" : connectionID != nil ? "local_credential_configuration" : "unknown",reason:reason,historyPeriodCount:periods.count,confirmedRenewalCount:periods.filter(\.detectedBetweenReadings).count,periodFirstObservedRemainingPercent:firstInPeriod?.remaining,periodObservedHours:firstInPeriod.map{(snapshot.queriedAt.timeIntervalSince1970-$0.observed)/3600},recentPercentPerHour:recentRate,baselinePercentPerHour:priorRate,historicalCalendarPercentPerHour:historyClockRate,historicalCalendarHours:historyClockSeconds/3600,calendarPercentPerHour:currentClockRate,calendarHours:(currentClock?.0 ?? 0)/3600)
         }
     }
 }
@@ -200,5 +259,27 @@ func runUsageTimelineTests() {
     check(InsightBasis.signature([context])==InsightBasis.signature([countOnly]),"counts alone do not invalidate a still-current insight")
     var changedReference=context;changedReference.periodFirstObservedRemainingPercent=80
     check(InsightBasis.signature([context]) != InsightBasis.signature([changedReference]),"changed historical reference invalidates the previous insight")
+    var changing=UsageTimeline()
+    // Three separate half-hour observations in each non-overlapping period.
+    func trendSnapshot(_ offset:Double,_ balance:Double)->QuotaSnapshot {
+        var value=QuotaSnapshot(queriedAt:now.addingTimeInterval(offset),windows:[QuotaWindow(name:"week",remaining:balance,durationMinutes:10080,reset:now.timeIntervalSince1970+86400)])
+        value.provider="codex";value.identityFingerprint="one";return value
+    }
+    let boundaryReadings:[(Double,Double)]=[(-176400,100),(-174600,99),(-172800,98),(-108900,98),(-107100,90),(-90000,90),(-88200,89),(-86400,88),(-22500,88),(-20700,87),(-3600,80),(-1800,76),(0,72)]
+    for (offset,balance) in boundaryReadings {
+        _=changing.ingest(trendSnapshot(offset,balance),now:now)
+    }
+    var utc=Calendar(identifier:.gregorian);utc.timeZone=TimeZone(secondsFromGMT:0)!
+    let compared=changing.projections(for:trendSnapshot(0,72),now:now,calendar:utc)[0]
+    check(compared.recentPercentPerHour==8 && compared.baselinePercentPerHour==2,"matched previous days and current period exclude the pair crossing the six-hour boundary")
+    var historicalClock=UsageTimeline()
+    func calendarSnapshot(_ offset:Double,_ balance:Double,_ reset:Double)->QuotaSnapshot {
+        var value=QuotaSnapshot(queriedAt:now.addingTimeInterval(offset),windows:[QuotaWindow(name:"week",remaining:balance,durationMinutes:10080,reset:now.timeIntervalSince1970+reset)])
+        value.provider="codex";value.identityFingerprint="one";return value
+    }
+    _=historicalClock.ingest(calendarSnapshot(-50*3600,100,-3600),now:now)
+    _=historicalClock.ingest(calendarSnapshot(-2*3600,80,-3600),now:now)
+    let clockProjection=historicalClock.projections(for:calendarSnapshot(0,99,7*86400),now:now)[0]
+    check(clockProjection.historicalCalendarHours==48 && abs(clockProjection.historicalCalendarPercentPerHour!-20.0/48)<0.0001,"previous periods retain wall-clock pauses and do not cross resets")
     print("PASS Usage timeline: \(count) checks")
 }

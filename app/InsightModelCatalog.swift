@@ -9,8 +9,29 @@ struct InsightModelCatalog {
         switch provider {case "codex":names=["CODEX_MODEL","OPENAI_MODEL"];case "claude":names=["ANTHROPIC_MODEL"];case "kimi":names=["KIMI_MODEL"];default:names=[]}
         return names.compactMap{environment[$0]}.filter{safeModel($0)}
     }
+    static func catalogText(_ data:Data)->String? {
+        String(data:data,encoding:.utf8)?.replacingOccurrences(of:"\u{1b}\\[[0-?]*[ -/]*[@-~]",with:"",options:.regularExpression)
+    }
+    static func availableProviders(_ data:Data,harness:InsightHarness)->[String] {
+        let routes:[String:String]=harness == .opencode ? ["openai":"codex","kimi-code-plan-global":"kimi","zai-coding-plan":"zai"] : ["openai-codex":"codex","kimi-coding":"kimi","zai":"zai"]
+        guard let text=catalogText(data) else{return []}
+        let names=text.components(separatedBy:.newlines).compactMap {line -> String? in
+            let parts=line.split(whereSeparator:{$0.isWhitespace}).map(String.init)
+            if harness == .opencode {return line.split(separator:"/").first.map(String.init).flatMap{routes[$0]}}
+            guard parts.count>=2,safeModel(parts[1]) else{return nil}
+            return routes[parts[0]]
+        }
+        return Array(Set(names)).sorted()
+    }
+    static func resultMessage(models:[String],data:Data,harness:InsightHarness,provider:String)->String {
+        let title=InsightHarness.providerTitle(provider)
+        if !models.isEmpty {return "\(models.count) modelo(s) de \(title) encontrado(s) em \(harness.title). Selecione um e aplique as opções."}
+        let alternatives=availableProviders(data,harness:harness).filter{$0 != provider}.map{InsightHarness.providerTitle($0)}
+        if !alternatives.isEmpty {return "O catálogo de \(harness.title) não retornou modelos de \(title). Encontrou: \(alternatives.joined(separator:", ")). Escolha o provedor correspondente acima."}
+        return "O catálogo de \(harness.title) não retornou modelos de \(title). Confira a configuração desse provedor no cliente; nenhuma credencial foi alterada."
+    }
     static func piModels(_ data:Data,provider:String)->[String] {
-        guard let text=String(data:data,encoding:.utf8) else{return []}
+        guard let text=catalogText(data) else{return []}
         var seen=Set<String>()
         return text.components(separatedBy:.newlines).compactMap {line in
             let parts=line.split(whereSeparator:{$0.isWhitespace}).map(String.init)
@@ -32,11 +53,11 @@ struct InsightModelCatalog {
         }
     }
     static func openCodeModels(_ data:Data,provider:String)->[String] {
-        guard let text=String(data:data,encoding:.utf8) else{return []}
+        guard let text=catalogText(data) else{return []}
         return text.components(separatedBy:.newlines).filter{$0.hasPrefix(provider+"/") && safeModel($0)}
     }
     static func kimiModels(_ data:Data)->[String] {
-        guard let text=String(data:data,encoding:.utf8) else{return []}
+        guard let text=catalogText(data) else{return []}
         return text.components(separatedBy:.newlines).filter{$0.hasPrefix("Default model: kimi-code/")}.compactMap {line in
             let value=String(line.dropFirst("Default model: ".count));return safeModel(value) ? value : nil
         }
@@ -55,5 +76,12 @@ func runInsightModelTests() {
     check(InsightBasis.isStale(generatedAt:now,basis:[projection],current:[projection],now:now.addingTimeInterval(1801)),"reset invalidates an old insight")
     check(InsightBasis.isStale(generatedAt:now,basis:[projection],current:[],now:now),"missing provider invalidates old insight")
     check(InsightBasis.isStale(generatedAt:now,basis:[],current:[],now:now.addingTimeInterval(3601)),"one-hour age bound")
+    let pi=Data("provider model context\nkimi-coding kimi-for-coding 256K\nkimi-coding k3 1M\nmoonshotai kimi-k3 1M".utf8)
+    check(InsightModelCatalog.piModels(pi,provider:"openai-codex").isEmpty && InsightModelCatalog.piModels(pi,provider:"kimi-coding")==["kimi-for-coding","k3"],"the selected plan, not the terminal's active model, determines the catalog")
+    let message=InsightModelCatalog.resultMessage(models:[],data:pi,harness:.pi,provider:"codex")
+    check(message.contains("Codex") && message.contains("Kimi Code"),"empty filtered catalog explains the available coding-plan route")
+    check(InsightModelCatalog.availableProviders(pi,harness:.pi)==["kimi"],"unrelated API routes are not offered as coding-plan subscriptions")
+    let colored=Data("\u{1b}[32mkimi-coding\u{1b}[0m kimi-for-coding 256K".utf8)
+    check(InsightModelCatalog.piModels(colored,provider:"kimi-coding")==["kimi-for-coding"],"ANSI colors do not hide catalog models")
     print("PASS Insight model discovery: \(n) checks")
 }

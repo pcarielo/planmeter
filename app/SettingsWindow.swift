@@ -19,23 +19,26 @@ final class SettingsModel: ObservableObject {
     @Published var selected="general"
     @Published var advancedExpanded=false
     @Published var insight=InsightPreferences()
+    @Published var insightApplied=InsightPreferences()
     @Published var insightMessage=""
     @Published var insightPath=""
     @Published var insightBusy=false
     @Published var insightPro=false
     @Published var insightProviders:[String]=[]
     @Published var insightModels:[String]=[]
+    var displayedInsightMessage:String {insight != insightApplied ? "Alterações pendentes. Use Aplicar opções ou Buscar modelos para usar esta seleção." : insightMessage}
+    var displayedInsightPath:String {insight.sameCatalog(as:insightApplied) ? (insightPath.isEmpty ? "Executável não encontrado" : insightPath) : "Caminho será verificado ao aplicar opções"}
     var onInsightModels:()->Void={}
     var onInsightChange:(InsightPreferences)->Void={_ in}
     var onInsightCheck:()->Void={}
     func chooseInsightProvider(_ provider:String) {
         guard provider != insight.provider else{return}
-        insight.provider=provider;insight.model="";insight.executablePath="";insightModels=[]
-        if let preferred=InsightHarness.preferred(for:provider) {insight.harness=preferred}
+        insight.provider=provider;insight.model="";insightModels=[]
+        if !InsightHarness.compatible(with:provider).contains(insight.harness),let preferred=InsightHarness.preferred(for:provider) {insight.harness=preferred;insight.executablePath=""}
         insightMessage="Aplique as opções e busque os modelos do cliente escolhido."
     }
     func chooseInsightHarness(_ harness:InsightHarness) {
-        guard harness != insight.harness else{return}
+        guard harness != insight.harness,InsightHarness.compatible(with:insight.provider).contains(harness) else{return}
         insight.harness=harness;insight.model="";insight.executablePath="";insightModels=[]
         insightMessage="Aplique as opções e busque os modelos do cliente escolhido."
     }
@@ -162,21 +165,26 @@ private struct SettingsRootView: View {
                         Text("Escolher…").tag("")
                         ForEach(model.insightProviders,id:\.self) {key in Text(key == "claude" ? "Claude Code" : key == "kimi" ? "Kimi Code" : key.capitalized).tag(key)}
                     }
-                    if !model.insightModels.isEmpty {
+                    if !model.insightModels.isEmpty && model.insight.sameCatalog(as:model.insightApplied) {
                         Picker("Modelos encontrados",selection:$model.insight.model) {
                             Text("Escolher…").tag("")
+                            if !model.insight.model.isEmpty && !model.insightModels.contains(model.insight.model) {Text(model.insight.model+" (manual)").tag(model.insight.model)}
                             ForEach(model.insightModels,id:\.self){name in Text(name).tag(name)}
                         }
                     }
                     TextField("Modelo",text:$model.insight.model)
                     Button("Buscar modelos no harness"){model.onInsightModels()}.disabled(model.insightBusy)
-                    Picker("Harness",selection:Binding(get:{model.insight.harness},set:{model.chooseInsightHarness($0)})) {ForEach(InsightHarness.compatible(with:model.insight.provider),id:\.self) {harness in Text(harness.title).tag(harness)}}
+                    Picker("Harness",selection:Binding(get:{model.insight.harness},set:{model.chooseInsightHarness($0)})) {ForEach(InsightHarness.allCases,id:\.self) {harness in
+                        let compatible=InsightHarness.compatible(with:model.insight.provider).contains(harness)
+                        Text(compatible ? harness.title : harness.title+" · para "+harness.compatibleProviderNames).tag(harness).disabled(!compatible)
+                    }}
                     TextField("Caminho alternativo (opcional)",text:$model.insight.executablePath)
-                    Text(model.insightPath.isEmpty ? "Executável não encontrado" : model.insightPath).font(.system(size:12)).textSelection(.enabled)
+                    Text(model.displayedInsightPath).font(.system(size:12)).textSelection(.enabled)
                     Button("Aplicar opções"){model.onInsightChange(model.insight)}
                     Button("Verificar conexão"){model.onInsightCheck()}.disabled(model.insightBusy || !model.insightPro)
-                    Text(model.insightMessage).foregroundColor(.secondary)
-                    Text("Confirme a conta no cliente escolhido; ela pode ser diferente da conta monitorada. O provedor recebe um resumo agregado de todos os planos ativos. Não são enviados chaves, transcrições ou arquivos dos seus projetos. A resposta é uma estimativa, não uma garantia.").font(.system(size:13)).foregroundColor(.secondary)
+                    Text(model.displayedInsightMessage).foregroundColor(.secondary)
+                    Text("O provedor que gera o insight é independente dos planos monitorados. A lista de modelos é filtrada por esse provedor; clientes incompatíveis nesta integração ficam visíveis, mas desabilitados.").font(.system(size:13)).foregroundColor(.secondary)
+                    Text("Confirme a conta no cliente escolhido; ela pode ser diferente da conta monitorada. O provedor recebe sinais analíticos calculados sobre os planos ativos. Não são enviados chaves, transcrições ou arquivos dos seus projetos. A resposta é uma estimativa, não uma garantia.").font(.system(size:13)).foregroundColor(.secondary)
                 }.disabled(!model.insightPro)
             }.formStyle(.grouped).tabItem{Label("Insights",systemImage:"sparkles")}.tag("insights")
             Form {
@@ -202,7 +210,7 @@ private struct SettingsRootView: View {
                 Text("PlanMeter").font(.largeTitle.bold())
                 Text("Desenvolvido por Paulo Carielo").font(.system(size:16))
                 Text("Versão " + (Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "local"))
-                Text("Quotas e histórico locais. Chaves no Keychain. Insights opcionais enviam um resumo ao modelo escolhido.").multilineTextAlignment(.center).foregroundColor(.secondary)
+                Text("Quotas e histórico locais. Chaves no Keychain. Insights opcionais enviam sinais analíticos ao modelo escolhido.").multilineTextAlignment(.center).foregroundColor(.secondary)
                 Link("Privacidade e segurança",destination:URL(string:"https://github.com/pcarielo/planmeter/blob/main/docs/security.md")!)
                 Link("Suporte e código-fonte",destination:URL(string:"https://github.com/pcarielo/planmeter")!)
             }.padding(44).tabItem{Label("Sobre",systemImage:"info.circle")}.tag("about")
@@ -279,5 +287,16 @@ func runSettingsTests() {
     check(model.insight.harness == .pi && model.insight.model=="fixture-model","loading preserves an explicitly chosen alternate harness")
     model.chooseInsightProvider("claude")
     check(model.insight.harness == .claude && model.insight.model.isEmpty,"user provider change selects native harness and clears incompatible model")
+    var piDraft=InsightPreferences();piDraft.provider="codex";piDraft.harness = .pi;piDraft.executablePath="/fixture/custom/pi"
+    model.configureInsight(piDraft);model.insightApplied=piDraft
+    model.chooseInsightProvider("kimi")
+    check(model.insight.harness == .pi && model.insight.executablePath=="/fixture/custom/pi","switching to Kimi preserves explicitly selected compatible pi")
+    check(model.displayedInsightMessage.contains("pendentes"),"unapplied model selection is explicit")
+    model.chooseInsightProvider("codex");model.chooseInsightHarness(.kimi)
+    check(model.insight.harness == .pi,"incompatible native Kimi cannot silently use Codex billing")
+    var changedModel=piDraft;changedModel.model="another-model"
+    check(changedModel.sameCatalog(as:piDraft),"choosing a model preserves the catalog")
+    changedModel.executablePath="/different/pi"
+    check(!changedModel.sameCatalog(as:piDraft),"alternate executable invalidates old catalog")
     print("PASS Settings: \(count) checks; no login-item changes")
 }
