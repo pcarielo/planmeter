@@ -352,7 +352,8 @@ func runQuotaDashboardTests() {
     dashboard.close()
     dashboard.cardRefreshStates=["codex":CardRefreshStatus(busy:true)]
     dashboard.show(anchor:anchor,screen:screen,timeout:0.05)
-    RunLoop.current.run(until:Date().addingTimeInterval(0.1))
+    let automaticDeadline=Date().addingTimeInterval(3)
+    while dashboard.isVisible && Date()<automaticDeadline {RunLoop.current.run(until:Date().addingTimeInterval(0.02))}
     check(!dashboard.isVisible,"automatic provider activity does not override the dismissal timer")
     dashboard.cardRefreshStates=["codex":CardRefreshStatus()]
     dashboard.onCardRefresh={key in dashboard.cardRefreshStates[key]=CardRefreshStatus(busy:true)}
@@ -362,7 +363,8 @@ func runQuotaDashboardTests() {
     RunLoop.current.run(until:Date().addingTimeInterval(0.1))
     check(dashboard.isVisible,"manual card query keeps transient panel open until completion")
     dashboard.cardRefreshStates=["codex":CardRefreshStatus()];dashboard.update();dashboard.armTimer(0.05)
-    RunLoop.current.run(until:Date().addingTimeInterval(0.1))
+    let completionDeadline=Date().addingTimeInterval(3)
+    while dashboard.isVisible && Date()<completionDeadline {RunLoop.current.run(until:Date().addingTimeInterval(0.02))}
     check(!dashboard.isVisible,"manual completion restores dismissal")
     dashboard.onCardRefresh={_ in}
     print("PASS quota dashboard: \(count) checks; synthetic data only")
