@@ -46,6 +46,7 @@
   "A consulta ativa será desativada. O login Claude permanece intacto. Na leitura passiva, Atualizar apenas relê a statusline e pode não trazer quotas recentes.": "Se desactivará la consulta activa. El inicio de sesión de Claude permanece intacto. En la lectura pasiva, Actualizar solo vuelve a leer la statusline y puede no mostrar cuotas recientes.",
   "A instalação em uso é ": "La instalación en uso es ",
   "A integração escolhida ainda não está disponível ou o modelo não foi informado.": "La integración elegida aún no está disponible o no se indicó el modelo.",
+  "A interface muda imediatamente. Sua escolha fica salva.": "La interfaz cambia al instante. Tu elección se guarda.",
   "Abra PlanMeter primeiro, depois use a DEMO no menu.": "Abre primero PlanMeter y luego usa la DEMO del menú.",
   "Abrir Itens de Início do macOS": "Abrir Ítems de inicio de macOS",
   "Abrir ao iniciar a sessão": "Abrir al iniciar sesión",

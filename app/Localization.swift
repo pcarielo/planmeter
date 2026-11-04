@@ -29,14 +29,43 @@ enum L10n {
               let value=object["language"] as? String,supportedSelections.contains(value) else{return "system"}
         return value
     }()
-    private static let launchCode=resolvedCode(selection:savedSelection,preferredLanguage:Locale.preferredLanguages.first)
+    private static var activeCode=resolvedCode(selection:savedSelection,preferredLanguage:Locale.preferredLanguages.first)
     private static let lock=NSRecursiveLock()
     private static var cache:[String:[String:String]]=[:]
     private static var testCode:String?
     static var code:String {
         lock.lock();defer{lock.unlock()}
         if testMode {return testCode ?? "pt-BR"}
-        return launchCode
+        return activeCode
+    }
+    private struct MessageRecord {let key:String;let arguments:[String]}
+    private static var rendered:[String:MessageRecord]=[:]
+    private static var renderedOrder:[String]=[]
+    private static var renderedDates:[String:Date]=[:]
+    @discardableResult static func apply(selection:String)->Bool {
+        let next=resolvedCode(selection:selection,preferredLanguage:Locale.preferredLanguages.first)
+        lock.lock();defer{lock.unlock()}
+        let previous=testMode ? (testCode ?? "pt-BR") : activeCode
+        if testMode {testCode=next} else {activeCode=next}
+        return previous != next
+    }
+    static func rememberDate(_ text:String,date:Date) {
+        lock.lock();defer{lock.unlock()}
+        if renderedDates.count>512 {renderedDates.removeAll()}
+        renderedDates[text]=date
+    }
+    // Presentation only: never pass model IDs, paths or persisted data through this.
+    static func relocalized(_ text:String)->String {
+        lock.lock();defer{lock.unlock()}
+        if let record=rendered[text] {
+            let arguments=record.arguments.map {value in renderedDates[value].map{localDate($0)} ?? value}
+            return render(record.key,arguments:arguments)
+        }
+        if catalog("pt-BR")[text] != nil {return render(text)}
+        for language in languages where language != code {
+            if let key=catalog(language).first(where:{$0.value==text && !$0.key.contains("$@")})?.key {return render(key)}
+        }
+        return text
     }
     static func resolvedCode(selection:String,preferredLanguage:String?)->String {
         if languages.contains(selection){return selection}
@@ -70,7 +99,16 @@ enum L10n {
     static func render(_ key:String,arguments:[String]=[],language:String?=nil)->String {
         let language=language ?? code
         let template=catalog(language)[key] ?? catalog("en")[key] ?? key
-        return substitute(template,arguments:arguments)
+        let result=substitute(template,arguments:arguments)
+        lock.lock()
+        if rendered[result]==nil {renderedOrder.append(result)}
+        rendered[result]=MessageRecord(key:key,arguments:arguments)
+        if renderedOrder.count>4096 {
+            for value in renderedOrder.prefix(512){rendered.removeValue(forKey:value)}
+            renderedOrder.removeFirst(512)
+        }
+        lock.unlock()
+        return result
     }
     static func substitute(_ template:String,arguments:[String])->String {
         let regex=try! NSRegularExpression(pattern:"%([1-9][0-9]*)\\$@")

@@ -280,7 +280,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         model.insightPro=planAccess.isPro;model.insightBusy=insights.busy;model.insightApplied=insights.preferences
         if model.insight.sameCatalog(as:insights.preferences) {
             model.insightModels=insights.models;model.insightPath=insights.executable ?? ""
-            if model.insight==insights.preferences {model.insightMessage=insights.message}
+            if model.insight==insights.preferences {model.insightMessage=L10n.relocalized(insights.message)}
         }
         model.insightProviders=InsightHarness.modelProviders
     }
@@ -420,7 +420,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self=self,self.planAccess.isPro,InsightHarness.modelProviders.contains(self.settingsWindow.model.insight.provider) else{return}
             self.configureInsight(self.settingsWindow.model.insight);self.insights.checkConnection()
         }
-        model.licenseMessage=licenseStore.message;model.licensePrice=licenseStore.price;model.licenseBusy=licenseStore.busy
+        model.licenseMessage=L10n.relocalized(licenseStore.message);model.licensePrice=licenseStore.price;model.licenseBusy=licenseStore.busy
         model.onPurchase = {[weak self] in self?.licenseStore.purchase()}
         model.onRestore = {[weak self] in self?.licenseStore.restore()}
         #if PLANMETER_DEVELOPMENT
@@ -446,9 +446,16 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             else {self.settingsWindow.model.logError=L("Ainda não há registros para esta categoria.")}
         }
         model.onChange = { [weak self] interface,confetti,respect in
-            guard let self=self else{return};self.interfacePreferences=interface
+            guard let self=self else{return}
+            let changedLanguage=self.interfacePreferences.language != interface.language
+            self.interfacePreferences=interface
             self.preferences.loopEnabled=confetti;self.preferences.respectReduceMotion=respect
-            self.saveInterfacePreferences();self.savePreferences();self.audit(.configuration,.app,.settingsChanged,.success);self.applyInterfacePreferences();self.updateUI()
+            self.saveInterfacePreferences();self.savePreferences()
+            if changedLanguage {
+                _=L10n.apply(selection:interface.language)
+                self.configureMainMenu();self.settingsWindow.refreshLanguage();self.renewalWindow.refreshLanguage();self.shownKey=nil
+            }
+            self.audit(.configuration,.app,.settingsChanged,.success);self.applyInterfacePreferences();self.updateUI()
         }
         settingsWindow.show(page:page)
     }
@@ -837,7 +844,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if CommandLine.arguments.contains("--loop-self-test") { runLoopTests(); return }
         if CommandLine.arguments.contains("--ui-self-test") {
             guard let i = CommandLine.arguments.firstIndex(of: "--codex"), i+1 < CommandLine.arguments.count else { exit(2) }
-            runClaudeQuotaMonitorTests();runPlanAccessUITests();runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); runQuotaDashboardTests();runResetNoticeTests();runAccessTests();runSettingsTests();runRenewalHistoryUITests();runLocalizationUITests(); return
+            runClaudeQuotaMonitorTests();runPlanAccessUITests();runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); runQuotaDashboardTests();runResetNoticeTests();runAccessTests();runSettingsTests();runRenewalHistoryUITests();runLocalizationUITests();runLiveLanguageTests(); return
         }
         if CommandLine.arguments.contains("--demo-confetti") || CommandLine.arguments.contains("--demo-confetti-motion") {
             // One request to the running app: no second persistent demo app/process or model call.

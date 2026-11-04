@@ -46,6 +46,7 @@
   "A consulta ativa será desativada. O login Claude permanece intacto. Na leitura passiva, Atualizar apenas relê a statusline e pode não trazer quotas recentes.": "アクティブ照会は無効になります。Claudeのログインは保持されます。パッシブ読み取りでは、更新はstatuslineを再読み込みするだけのため、最新の利用枠を取得できない場合があります。",
   "A instalação em uso é ": "使用中のインストール：",
   "A integração escolhida ainda não está disponível ou o modelo não foi informado.": "選択した連携はまだ利用できないか、モデルが指定されていません。",
+  "A interface muda imediatamente. Sua escolha fica salva.": "表示言語はすぐに切り替わり、選択内容が保存されます。",
   "Abra PlanMeter primeiro, depois use a DEMO no menu.": "先にPlanMeterを開いてから、メニューのDEMOを使用してください。",
   "Abrir Itens de Início do macOS": "macOSのログイン項目を開く",
   "Abrir ao iniciar a sessão": "ログイン時に開く",

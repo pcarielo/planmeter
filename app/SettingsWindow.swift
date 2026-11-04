@@ -29,6 +29,7 @@ struct InterfacePreferences: Codable, Equatable {
 }
 final class SettingsModel: ObservableObject {
     @Published var selected="general"
+    @Published var languageRevision=0
     @Published var advancedExpanded=false
     @Published var insight=InsightPreferences()
     @Published var insightApplied=InsightPreferences()
@@ -128,12 +129,6 @@ private struct SettingsRootView: View {
     var body:some View {
         TabView(selection:$model.selected) {
             Form {
-                Section(L("Idioma da interface")) {
-                    Picker(L("Idioma"),selection:$model.interface.language) {
-                        ForEach(L10n.choices,id:\.code) {option in Text(verbatim:option.name).tag(option.code)}
-                    }
-                    Text(L("O idioma escolhido será aplicado ao reabrir o PlanMeter.")).font(.system(size:13)).foregroundColor(.secondary)
-                }
                 Section(L("Inicialização")) {
                     Toggle(L("Abrir ao iniciar a sessão"),isOn:Binding(get:{model.loginEnabled || model.loginPending},set:{model.setLogin($0)})).disabled(model.legacyLogin && !model.loginEnabled && !model.loginPending)
                     if model.legacyLogin {Text(L("Há um início automático configurado pelo instalador anterior. Desative essa configuração pelo script login-item.sh antes de ativar a opção nativa.")).font(.system(size:13))}
@@ -223,6 +218,14 @@ private struct SettingsRootView: View {
                     Text(L("O aplicativo apenas observa renovações. Não executa resets nem consome modelos para testar limites.")).font(.system(size:13)).foregroundColor(.secondary)
                 }
             }.formStyle(.grouped).tabItem{Label(L("Avisos"),systemImage:"bell")}.tag("notifications")
+            Form {
+                Section(L("Idioma da interface")) {
+                    Picker(L("Idioma"),selection:$model.interface.language) {
+                        ForEach(L10n.choices,id:\.code) {option in Text(verbatim:option.name).tag(option.code)}
+                    }
+                    Text(L("A interface muda imediatamente. Sua escolha fica salva.")).foregroundColor(.secondary)
+                }
+            }.formStyle(.grouped).tabItem{Label(L("Idioma"),systemImage:"globe")}.tag("language")
             VStack(spacing:16) {
                 Image(systemName:"gauge").font(.system(size:48)).foregroundColor(.accentColor)
                 Text("PlanMeter").font(.largeTitle.bold())
@@ -232,7 +235,7 @@ private struct SettingsRootView: View {
                 Link(L("Privacidade e segurança"),destination:URL(string:"https://github.com/pcarielo/planmeter/blob/main/docs/security.md")!)
                 Link(L("Suporte e código-fonte"),destination:URL(string:"https://github.com/pcarielo/planmeter")!)
             }.padding(44).tabItem{Label(L("Sobre"),systemImage:"info.circle")}.tag("about")
-        }.font(.system(size:15)).padding(12).frame(width:660,height:610)
+        }.id(model.languageRevision).font(.system(size:15)).padding(12).frame(width:660,height:610)
     }
 }
 final class SettingsWindow: NSObject, NSWindowDelegate {
@@ -249,6 +252,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps:true);window?.makeKeyAndOrderFront(nil)
+    }
+    func refreshLanguage() {
+        window?.title=L("Configurações do PlanMeter")
+        model.loginMessage=L10n.relocalized(model.loginMessage)
+        model.logError=L10n.relocalized(model.logError)
+        model.licenseMessage=L10n.relocalized(model.licenseMessage)
+        model.insightMessage=L10n.relocalized(model.insightMessage)
+        model.languageRevision += 1
     }
     func windowWillClose(_ notification:Notification) {if let window=window {refreshUtilityActivation(excluding:window)}}
     deinit {if let observer=keyObserver {NotificationCenter.default.removeObserver(observer)}}

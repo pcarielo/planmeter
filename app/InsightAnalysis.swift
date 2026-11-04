@@ -11,7 +11,7 @@ struct InsightSignal:Codable,Equatable {
 }
 
 enum InsightAnalysis {
-    static let waitingMessage=L("O histórico está sendo acompanhado. Ainda não há um sinal de ritmo ou risco que justifique uma análise.")
+    static var waitingMessage:String {L("O histórico está sendo acompanhado. Ainda não há um sinal de ritmo ou risco que justifique uma análise.")}
     static func decimal(_ value:Double)->String {L10n.decimal(value)}
     static func signals(_ projections:[UsageProjection],now:Date=Date())->[InsightSignal] {
         var result:[InsightSignal]=[]

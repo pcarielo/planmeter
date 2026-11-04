@@ -4,7 +4,7 @@ O PlanMeter oferece English, Español, Português, 한국어, 日本語, França
 
 ## Escolher um idioma
 
-Abra Configurações → Geral → Idioma da interface. A opção inicial segue o idioma principal do macOS. Quando ele não é oferecido, o aplicativo usa inglês. Você também pode escolher um dos oito idiomas diretamente. Reabra o PlanMeter para aplicar a escolha à interface inteira.
+Abra Configurações → Idioma. A opção inicial segue o idioma principal do macOS. Quando ele não é oferecido, o aplicativo usa inglês. Você também pode escolher um dos oito idiomas diretamente. A escolha atualiza a interface imediatamente e fica salva para as próximas aberturas.
 
 A tradução em português é brasileira e aparece no seletor apenas como Português. O chinês oferecido é tradicional; um sistema configurado em chinês simplificado usa o fallback inglês até que você escolha outro idioma.
 
