@@ -2,6 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLANMETER_ICON_MODE=initials "$ROOT/scripts/build.sh"
+python3 "$ROOT/tests/test_localization.py"
 python3 "$ROOT/tests/test_install.py"
 python3 "$ROOT/tests/test_claude_integration.py"
 node "$ROOT/tests/test_connect_proxy.js"

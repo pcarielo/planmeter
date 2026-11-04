@@ -6,6 +6,10 @@ O PlanMeter é um aplicativo Swift/AppKit que mostra o saldo disponível, as jan
 
 ![Exemplo com ícones de iniciais e valores fictícios](docs/images/statusbar.png)
 
+## Idiomas
+
+O aplicativo oferece oito idiomas, com escolha em Configurações → Geral → Idioma da interface. A opção inicial segue o macOS e usa inglês quando o idioma principal não está disponível. [Como escolher e contribuir com traduções](docs/languages.md).
+
 ## Painel de quotas
 
 Clique no indicador para abrir o painel completo. Só aparecem provedores com percentuais válidos, tanto na barra quanto no painel. Saldo de **0%** continua visível. Se nenhuma métrica estiver disponível, a barra mostra apenas **PlanMeter**, mantendo o acesso à configuração.

@@ -43,7 +43,7 @@ func parseQuota(_ result: [String: Any], now: Date = Date()) throws -> QuotaSnap
     } else {
         bucket = result["rateLimits"] as? [String: Any]
     }
-    guard let bucket = bucket else { throw QuotaError.message("Quota Codex indisponível") }
+    guard let bucket = bucket else { throw QuotaError.message(L("Quota Codex indisponível")) }
     var windows: [QuotaWindow] = []
     for name in ["primary", "secondary"] {
         guard let raw = bucket[name] as? [String: Any] else { continue }
@@ -60,13 +60,25 @@ func parseQuota(_ result: [String: Any], now: Date = Date()) throws -> QuotaSnap
 }
 func quotaWindowLabel(_ window:QuotaWindow)->String {
     if window.name.localizedCaseInsensitiveContains("MCP") {return "MCP"}
-    return window.durationMinutes.map {$0 == 10080 ? "Semanal" : durationLabel($0)} ?? window.name
+    return window.durationMinutes.map {$0 == 10080 ? L("Semanal") : durationLabel($0)} ?? L10n.render(window.name)
+}
+// This label is persisted as a legacy identity. Keep it language independent.
+func quotaWindowIdentityLabel(_ window:QuotaWindow)->String {
+    if window.name.localizedCaseInsensitiveContains("MCP"){return "MCP"}
+    guard let minutes=window.durationMinutes else{return window.name}
+    if minutes==10080 {return "Semanal"}
+    if minutes%1440==0 {return "\(minutes/1440) dias"}
+    if minutes%60==0 {return "\(minutes/60) horas"}
+    return "\(minutes) minutos"
 }
 func durationLabel(_ minutes: Int?) -> String {
-    guard let m = minutes else { return "duração não informada" }
-    if m % 1440 == 0 { return "\(m / 1440) dias" }
-    if m % 60 == 0 { return "\(m / 60) horas" }
-    return "\(m) minutos"
+    guard let m = minutes else { return L("duração não informada") }
+    if m == 1440 {return L("1 dia")}
+    if m == 60 {return L("1 hora")}
+    if m == 1 {return L("1 minuto")}
+    if m % 1440 == 0 { return L("\(m / 1440) dias") }
+    if m % 60 == 0 { return L("\(m / 60) horas") }
+    return L("\(m) minutos")
 }
 func percentLabel(_ value: Double?) -> String {
     guard let value = value else { return "—" }
@@ -74,9 +86,9 @@ func percentLabel(_ value: Double?) -> String {
 }
 func localDate(_ date: Date) -> String {
     let f = DateFormatter()
-    f.locale = Locale(identifier: "pt_BR")
-    f.timeZone = TimeZone(identifier: "America/Sao_Paulo")
-    f.dateFormat = "dd/MM HH:mm:ss zzz"
+    f.locale = L10n.locale
+    f.timeZone = .current
+    f.setLocalizedDateFormatFromTemplate("MMddHHmmssz")
     return f.string(from: date)
 }
 struct RefreshPolicy {
@@ -113,7 +125,7 @@ final class AppServerClient {
     private(set) var models:[String]=[]
     init(binary: String, timeout: TimeInterval = 20,purpose:AppServerPurpose = .quota) { self.binary = binary; self.timeout = timeout;self.purpose=purpose }
     func readModels()throws->[String] {
-        guard purpose == .models else{throw QuotaError.message("Cliente não configurado para catálogo")}
+        guard purpose == .models else{throw QuotaError.message(L("Cliente não configurado para catálogo"))}
         _=try read();return models
     }
     func cancel() {
@@ -138,8 +150,8 @@ final class AppServerClient {
         let null = FileHandle(forWritingAtPath: "/dev/null")!
         p.standardError = null
         lock.lock(); process = p; let stop = cancelled; lock.unlock()
-        if stop { throw QuotaError.message("Consulta cancelada") }
-        do { try p.run() } catch { throw QuotaError.message("CLI Codex não pôde iniciar") }
+        if stop { throw QuotaError.message(L("Consulta cancelada")) }
+        do { try p.run() } catch { throw QuotaError.message(L("CLI Codex não pôde iniciar")) }
         defer {
             try? input.fileHandleForWriting.close()
             let end = Date().addingTimeInterval(2)
@@ -165,12 +177,12 @@ final class AppServerClient {
             if method == "account/rateLimits/read" { quotaRequests += 1 }
             try send(["id": id, "method": method, "params": params])
             while true {
-                if isCancelled() { throw QuotaError.message("Consulta cancelada") }
-                if Date() >= deadline { throw QuotaError.message("Consulta excedeu 20 segundos") }
+                if isCancelled() { throw QuotaError.message(L("Consulta cancelada")) }
+                if Date() >= deadline { throw QuotaError.message(L("Consulta excedeu 20 segundos")) }
                 while let newline = buffer.firstIndex(of: 10) {
                     let line = Data(buffer[..<newline]); buffer.removeSubrange(...newline)
                     guard let msg = try JSONSerialization.jsonObject(with: line) as? [String: Any] else {
-                        throw QuotaError.message("Resposta oficial inválida")
+                        throw QuotaError.message(L("Resposta oficial inválida"))
                     }
                     if let method = msg["method"] as? String {
                         if let serverID = msg["id"] {
@@ -180,34 +192,34 @@ final class AppServerClient {
                         continue
                     }
                     if number(msg["id"]) == Double(id) {
-                        if msg["error"] != nil { throw QuotaError.message("Falha na leitura oficial; confira login/rede no Codex") }
-                        guard let value = msg["result"] as? [String: Any] else { throw QuotaError.message("Resposta oficial inválida") }
+                        if msg["error"] != nil { throw QuotaError.message(L("Falha na leitura oficial; confira login/rede no Codex")) }
+                        guard let value = msg["result"] as? [String: Any] else { throw QuotaError.message(L("Resposta oficial inválida")) }
                         return value
                     }
                 }
                 var fd = pollfd(fd: output.fileHandleForReading.fileDescriptor, events: Int16(POLLIN), revents: 0)
                 let ready = Darwin.poll(&fd, 1, 200)
-                if ready < 0 { if errno == EINTR { continue }; throw QuotaError.message("Transporte indisponível") }
+                if ready < 0 { if errno == EINTR { continue }; throw QuotaError.message(L("Transporte indisponível")) }
                 if ready > 0 {
                     var bytes = [UInt8](repeating: 0, count: 8192)
                     let count = Darwin.read(fd.fd, &bytes, bytes.count)
-                    if count <= 0 { throw QuotaError.message("App-server encerrou a conexão") }
+                    if count <= 0 { throw QuotaError.message(L("App-server encerrou a conexão")) }
                     buffer.append(contentsOf: bytes.prefix(count))
-                    if buffer.count > 1_048_576 { throw QuotaError.message("Resposta excedeu limite local") }
+                    if buffer.count > 1_048_576 { throw QuotaError.message(L("Resposta excedeu limite local")) }
                 }
             }
         }
         _ = try request("initialize", ["clientInfo": ["name": "planmeter", "title": "PlanMeter", "version": "1.0.0"]])
         try send(["method": "initialized", "params": [:]])
         let account = try request("account/read", ["refreshToken": false])["account"] as? [String: Any]
-        guard account?["type"] as? String == "chatgpt" else { throw QuotaError.message("Login ChatGPT gerenciado indisponível") }
+        guard account?["type"] as? String == "chatgpt" else { throw QuotaError.message(L("Login ChatGPT gerenciado indisponível")) }
         if purpose == .models {
             var cursor:String?;var seen=Set<String>()
             for _ in 0..<8 {
                 var params:[String:Any]=["includeHidden":false,"limit":100]
                 if let cursor=cursor {params["cursor"]=cursor}
                 let result=try request("model/list",params)
-                guard let rows=result["data"] as? [[String:Any]] else{throw QuotaError.message("Catálogo indisponível")}
+                guard let rows=result["data"] as? [[String:Any]] else{throw QuotaError.message(L("Catálogo indisponível"))}
                 for row in rows {
                     if let model=row["id"] as? String,model.count<=120,model.range(of:"^[A-Za-z0-9][A-Za-z0-9._:/-]*$",options:.regularExpression) != nil,seen.insert(model).inserted {models.append(model)}
                 }

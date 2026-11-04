@@ -29,7 +29,7 @@ final class GrokClient {
             var snapshot=QuotaSnapshot(queriedAt:Date(),windows:[]);snapshot.provider="grok"
             return GrokReading(snapshot:snapshot,status:"cli_unavailable",nextAttemptAt:Date().addingTimeInterval(60))
         }
-        if GrokEnvironment.isTest && !binary.hasPrefix(FileManager.default.temporaryDirectory.path) {throw QuotaError.message("CLI real bloqueado em testes")}
+        if GrokEnvironment.isTest && !binary.hasPrefix(FileManager.default.temporaryDirectory.path) {throw QuotaError.message(L("CLI real bloqueado em testes"))}
         let directory=FileManager.default.temporaryDirectory.appendingPathComponent("planmeter-grok-"+UUID().uuidString)
         try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
         defer {try? FileManager.default.removeItem(at:directory)}
@@ -44,8 +44,8 @@ final class GrokClient {
         let null = FileHandle(forWritingAtPath: "/dev/null")!
         p.standardError = null
         lock.lock(); process = p; let stop = cancelled; lock.unlock()
-        if stop { throw QuotaError.message("Consulta cancelada") }
-        do { try p.run();didLaunch=true } catch { throw QuotaError.message("CLI Grok não pôde iniciar") }
+        if stop { throw QuotaError.message(L("Consulta cancelada")) }
+        do { try p.run();didLaunch=true } catch { throw QuotaError.message(L("CLI Grok não pôde iniciar")) }
         defer {
             try? input.fileHandleForWriting.close()
             let end = Date().addingTimeInterval(2)
@@ -71,12 +71,12 @@ final class GrokClient {
             if method == "_x.ai/billing" { quotaRequests += 1 }
             try send(["jsonrpc":"2.0", "id": id, "method": method, "params": params])
             while true {
-                if isCancelled() { throw QuotaError.message("Consulta cancelada") }
-                if Date() >= deadline { throw QuotaError.message("Consulta excedeu 25 segundos") }
+                if isCancelled() { throw QuotaError.message(L("Consulta cancelada")) }
+                if Date() >= deadline { throw QuotaError.message(L("Consulta excedeu 25 segundos")) }
                 while let newline = buffer.firstIndex(of: 10) {
                     let line = Data(buffer[..<newline]); buffer.removeSubrange(...newline)
                     guard let msg = try JSONSerialization.jsonObject(with: line) as? [String: Any] else {
-                        throw QuotaError.message("Resposta oficial inválida")
+                        throw QuotaError.message(L("Resposta oficial inválida"))
                     }
                     if let method = msg["method"] as? String {
                         if let serverID = msg["id"] {
@@ -86,20 +86,20 @@ final class GrokClient {
                         continue
                     }
                     if number(msg["id"]) == Double(id) {
-                        if msg["error"] != nil { throw QuotaError.message("Falha na leitura oficial; confira login/rede no Grok") }
-                        guard let value = msg["result"] as? [String: Any] else { throw QuotaError.message("Resposta oficial inválida") }
+                        if msg["error"] != nil { throw QuotaError.message(L("Falha na leitura oficial; confira login/rede no Grok")) }
+                        guard let value = msg["result"] as? [String: Any] else { throw QuotaError.message(L("Resposta oficial inválida")) }
                         return value
                     }
                 }
                 var fd = pollfd(fd: output.fileHandleForReading.fileDescriptor, events: Int16(POLLIN), revents: 0)
                 let ready = Darwin.poll(&fd, 1, 200)
-                if ready < 0 { if errno == EINTR { continue }; throw QuotaError.message("Transporte indisponível") }
+                if ready < 0 { if errno == EINTR { continue }; throw QuotaError.message(L("Transporte indisponível")) }
                 if ready > 0 {
                     var bytes = [UInt8](repeating: 0, count: 8192)
                     let count = Darwin.read(fd.fd, &bytes, bytes.count)
-                    if count <= 0 { throw QuotaError.message("CLI Grok encerrou a conexão") }
+                    if count <= 0 { throw QuotaError.message(L("CLI Grok encerrou a conexão")) }
                     buffer.append(contentsOf: bytes.prefix(count))
-                    if buffer.count > 1_048_576 { throw QuotaError.message("Resposta excedeu limite local") }
+                    if buffer.count > 1_048_576 { throw QuotaError.message(L("Resposta excedeu limite local")) }
                 }
             }
         }

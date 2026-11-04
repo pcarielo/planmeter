@@ -155,7 +155,7 @@ struct UsageTimeline:Codable {
             if let reset=reset {risk=remaining==0 ? true : exhaustion.map{$0<reset} ?? (rate==0 ? false : nil)} else {risk=nil}
             let reason:String? = snapshot.identityFingerprint==nil && connectionID==nil ? "account_unidentified" : reset==nil ? "reset_unavailable" : rate==nil ? "insufficient_coverage" : nil
             let periods=renewals.filter {entry in
-                entry.provider==snapshot.effectiveProvider && entry.minutes==window.durationMinutes && entry.window==quotaWindowLabel(window) && entry.startedAt>=cutoff && entry.startedAt<=end && entry.identity==snapshot.identityFingerprint
+                entry.provider==snapshot.effectiveProvider && entry.minutes==window.durationMinutes && entry.window==quotaWindowIdentityLabel(window) && entry.startedAt>=cutoff && entry.startedAt<=end && entry.identity==snapshot.identityFingerprint
             }
             let firstInPeriod:UsageSample?
             if snapshot.identityFingerprint != nil || connectionID != nil {

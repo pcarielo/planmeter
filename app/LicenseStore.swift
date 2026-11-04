@@ -17,7 +17,7 @@ final class LicenseStore {
     static let productID=Bundle.main.object(forInfoDictionaryKey:"PlanMeterProProductID") as? String ?? "io.github.pcarielo.planmeter.pro"
     private(set) var isPro=false
     private(set) var busy=false
-    private(set) var message="Free: até dois planos. Pro libera todos os planos e insights."
+    private(set) var message=L("Free: até dois planos. Pro libera todos os planos e insights.")
     private(set) var price:String?
     private var product:Product?
     private var listener:Task<Void,Never>?
@@ -39,31 +39,31 @@ final class LicenseStore {
         for await result in Transaction.currentEntitlements {
             if case .verified(let transaction)=result,LicenseEntitlement.grantsPro(verified:true,productID:transaction.productID,nonConsumable:transaction.productType == .nonConsumable,revoked:transaction.revocationDate != nil,upgraded:transaction.isUpgraded) {entitled=true}
         }
-        self.isPro=entitled;self.message=entitled ? "Pro ativo: todos os planos e insights." : "Free: até dois planos.";self.onChange()
+        self.isPro=entitled;self.message=entitled ? L("Pro ativo: todos os planos e insights.") : L("Free: até dois planos.");self.onChange()
         let available=try? await Product.products(for:[Self.productID]).first(where:{$0.type == .nonConsumable})
         await MainActor.run {
             self.isPro=entitled;self.product=available;self.price=available?.displayPrice
-            self.message=entitled ? "Pro ativo: todos os planos e insights." : available == nil ? "Free: até dois planos. A compra Pro ainda não está disponível nesta distribuição." : "Free: até dois planos. Pro libera todos os planos e insights."
+            self.message=entitled ? L("Pro ativo: todos os planos e insights.") : available == nil ? L("Free: até dois planos. A compra Pro ainda não está disponível nesta distribuição.") : L("Free: até dois planos. Pro libera todos os planos e insights.")
             self.onChange()
         }
     }
     func purchase() {
         guard !Runtime.isTest,!busy else{return}
-        guard let product=product else{message="A compra Pro ainda não está disponível nesta distribuição.";onChange();return}
+        guard let product=product else{message=L("A compra Pro ainda não está disponível nesta distribuição.");onChange();return}
         busy=true;onChange()
         Task { @MainActor [weak self] in
             guard let self=self else{return}
-            var text="Compra não concluída."
+            var text=L("Compra não concluída.")
             do {
                 switch try await product.purchase() {
                 case .success(.verified(let transaction)):
-                    await transaction.finish();await reload();text=isPro ? "Pro ativo." : "A compra não concedeu acesso Pro."
-                case .success(.unverified):text="Não foi possível verificar a compra."
-                case .pending:text="Compra aguardando aprovação."
-                case .userCancelled:text="Compra cancelada."
-                @unknown default:text="Compra não concluída."
+                    await transaction.finish();await reload();text=isPro ? L("Pro ativo.") : L("A compra não concedeu acesso Pro.")
+                case .success(.unverified):text=L("Não foi possível verificar a compra.")
+                case .pending:text=L("Compra aguardando aprovação.")
+                case .userCancelled:text=L("Compra cancelada.")
+                @unknown default:text=L("Compra não concluída.")
                 }
-            } catch {text="Não foi possível concluir a compra. Tente novamente."}
+            } catch {text=L("Não foi possível concluir a compra. Tente novamente.")}
             await MainActor.run {self.busy=false;self.message=text;self.onChange()}
         }
     }
@@ -73,7 +73,7 @@ final class LicenseStore {
         Task { @MainActor [weak self] in
             guard let self=self else{return}
             do {try await AppStore.sync();await reload()}
-            catch {await MainActor.run {self.message="Não foi possível restaurar as compras."}}
+            catch {await MainActor.run {self.message=L("Não foi possível restaurar as compras.")}}
             await MainActor.run {self.busy=false;self.onChange()}
         }
     }

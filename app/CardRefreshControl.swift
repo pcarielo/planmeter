@@ -4,12 +4,12 @@ struct CardRefreshStatus {
     var busy=false
     var nextAllowedAt=Date.distantPast
     var paused=false
-    var actionTitle="Atualizar agora"
+    var actionTitle=L("Atualizar agora")
     func enabled(now:Date=Date())->Bool {!busy && !paused && now>=nextAllowedAt}
     func label(now:Date=Date())->String {
-        if busy {return "Atualizando…"}
-        if paused {return "Atualizações pausadas"}
-        if now<nextAllowedAt {return "Disponível em \(Int(ceil(nextAllowedAt.timeIntervalSince(now))))s"}
+        if busy {return L("Atualizando…")}
+        if paused {return L("Atualizações pausadas")}
+        if now<nextAllowedAt {return L("Disponível em \(Int(ceil(nextAllowedAt.timeIntervalSince(now))))s")}
         return actionTitle
     }
 }
@@ -45,7 +45,7 @@ final class CardRefreshControl:NSButton {
         isEnabled=status.enabled(now:now)
         if wasEnabled != isEnabled {window?.invalidateCursorRects(for:self)}
         setAccessibilityLabel(providerName+": "+status.label(now:now))
-        setAccessibilityHelp("Atualiza somente este provedor e mantém o painel aberto.")
+        setAccessibilityHelp(L("Atualiza somente este provedor e mantém o painel aberto."))
         needsDisplay=true
     }
     override func updateTrackingAreas() {

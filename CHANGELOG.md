@@ -1,5 +1,11 @@
 # Alterações
 
+## 1.8.0 - 2026-11-04
+
+- Interface em inglês, espanhol, português, coreano, japonês, francês, chinês tradicional e hindi.
+- Preferência de idioma com opção automática e fallback para inglês; aplicação ao reabrir o app.
+- Datas localizadas e identidade de quotas, credenciais e histórico preservada entre idiomas.
+
 ## 1.7.1 - 2026-11-04
 
 - Aviso de renovação usa singular e plural por extenso, sem “(s)”.

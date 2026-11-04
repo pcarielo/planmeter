@@ -36,7 +36,7 @@ final class KimiClient: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate
                 return status("rate_limited",wait:seconds.isFinite ? min(86400,max(900,seconds)) : 900)
             default: return status("unavailable")
             }
-        } catch { throw QuotaError.message("Consulta Kimi falhou; nenhum detalhe privado foi registrado") }
+        } catch { throw QuotaError.message(L("Consulta Kimi falhou; nenhum detalhe privado foi registrado")) }
     }
     private func request(_ key: String) throws -> (Data, Int, String?) {
         guard !KimiEnvironment.isTest else { throw QuotaError.message("Rede bloqueada em testes") }
@@ -55,12 +55,12 @@ final class KimiClient: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate
         let session = URLSession(configuration: configuration, delegate:self, delegateQueue:nil)
         defer { session.invalidateAndCancel() }
         lock.lock()
-        if cancelled { lock.unlock(); throw QuotaError.message("Consulta cancelada") }
+        if cancelled { lock.unlock(); throw QuotaError.message(L("Consulta cancelada")) }
         let newTask = session.dataTask(with:request); task = newTask
         lock.unlock(); newTask.resume()
         guard finished.wait(timeout:.now()+17) == .success else { cancel(); throw QuotaError.message("Timeout") }
         lock.lock(); defer { lock.unlock() }
-        guard !cancelled, !failure, let response = response else { throw QuotaError.message("Rede indisponível") }
+        guard !cancelled, !failure, let response = response else { throw QuotaError.message(L("Rede indisponível")) }
         return (body, response.statusCode, response.value(forHTTPHeaderField:"Retry-After"))
     }
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {

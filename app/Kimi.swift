@@ -35,7 +35,7 @@ func kimiMinutes(_ window: [String:Any]) -> Int? {
 }
 func parseKimi(_ data: Data, now: Date = Date()) throws -> KimiReading {
     guard data.count <= 65536, let raw = try JSONSerialization.jsonObject(with:data) as? [String:Any] else {
-        throw QuotaError.message("Resposta Kimi inválida")
+        throw QuotaError.message(L("Resposta Kimi inválida"))
     }
     var windows: [QuotaWindow] = []
     var seen = Set<Int>()
@@ -54,13 +54,13 @@ func parseKimi(_ data: Data, now: Date = Date()) throws -> KimiReading {
             if let date = formatter.date(from:text) ?? ISO8601DateFormatter().date(from:text) { reset = date.timeIntervalSince1970; break }
         }
         if let reset = reset, reset <= now.timeIntervalSince1970 { return }
-        if let minutes = minutes, !seen.insert(minutes).inserted { throw QuotaError.message("Janelas Kimi duplicadas") }
+        if let minutes = minutes, !seen.insert(minutes).inserted { throw QuotaError.message(L("Janelas Kimi duplicadas")) }
         windows.append(QuotaWindow(name:label,remaining:remaining,durationMinutes:minutes,reset:reset))
     }
     // Kimi CLI's official /usage parser identifies the top-level usage summary as weekly.
     if let usage = raw["usage"] as? [String:Any] { try row(usage,minutes:10080,label:"Kimi semanal") }
     if let limits = raw["limits"] {
-        guard let rows = limits as? [[String:Any]], rows.count <= 32 else { throw QuotaError.message("Limites Kimi inválidos") }
+        guard let rows = limits as? [[String:Any]], rows.count <= 32 else { throw QuotaError.message(L("Limites Kimi inválidos")) }
         for value in rows {
             let detail = value["detail"] as? [String:Any] ?? value
             let window = value["window"] as? [String:Any] ?? value
@@ -69,7 +69,7 @@ func parseKimi(_ data: Data, now: Date = Date()) throws -> KimiReading {
             try row(detail,minutes:minutes,label:label)
         }
     }
-    guard !windows.isEmpty, windows.contains(where:{$0.remaining != nil}) else { throw QuotaError.message("Kimi não informou quotas reconhecidas") }
+    guard !windows.isEmpty, windows.contains(where:{$0.remaining != nil}) else { throw QuotaError.message(L("Kimi não informou quotas reconhecidas")) }
     var snapshot = QuotaSnapshot(queriedAt:now,windows:windows)
     snapshot.provider = "kimi";snapshot.bucketID = "kimi-code:quota"
     return KimiReading(snapshot:snapshot,status:"ok",nextAttemptAt:now.addingTimeInterval(60))
@@ -77,9 +77,9 @@ func parseKimi(_ data: Data, now: Date = Date()) throws -> KimiReading {
 func kimiStatus(_ status: String) -> String {
     switch status {
     case "ok": return ""
-    case "auth_unavailable": return "Kimi: use Configurações → Contas para cadastrar a chave ou autorizar o Keychain"
-    case "unauthorized": return "Kimi recusou a credencial; confira a chave do Coding Plan"
-    case "rate_limited": return "Kimi limitou consultas; aguarde o intervalo informado"
-    default: return "Consulta Kimi indisponível; última quota preservada"
+    case "auth_unavailable": return L("Kimi: use Configurações → Contas para cadastrar a chave ou autorizar o Keychain")
+    case "unauthorized": return L("Kimi recusou a credencial; confira a chave do Coding Plan")
+    case "rate_limited": return L("Kimi limitou consultas; aguarde o intervalo informado")
+    default: return L("Consulta Kimi indisponível; última quota preservada")
     }
 }

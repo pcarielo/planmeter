@@ -30,7 +30,7 @@ final class ClaudeQuotaMonitor {
             try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
             let file=directory.appendingPathComponent(name);try JSONEncoder().encode(value).write(to:file,options:.atomic)
             try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:file.path);return true
-        } catch {message="Não foi possível salvar o estado da consulta Claude.";return false}
+        } catch {message=L("Não foi possível salvar o estado da consulta Claude.");return false}
     }
     private func saveSchedule(){_ = save(["manual":manualAfter,"automatic":automaticAfter],"claude-quota-schedule.json")}
     func load() {
@@ -61,12 +61,12 @@ final class ClaudeQuotaMonitor {
     func refresh(manual:Bool,setup:Bool=false) {
         guard enabled,!paused,!busy else{return}
         let now=Date()
-        guard now>=manualAfter else {if manual {message="Claude: aguarde \(max(1,Int(ceil(manualAfter.timeIntervalSince(now)))))s para consultar.";onChange()};return}
+        guard now>=manualAfter else {if manual {message=L("Claude: aguarde \(max(1,Int(ceil(manualAfter.timeIntervalSince(now)))))s para consultar.");onChange()};return}
         guard manual || now>=automaticAfter else{return}
         manualAfter=now.addingTimeInterval(60);automaticAfter=now.addingTimeInterval(interval);saveSchedule()
         busy=true;requests += 1;generation += 1;let token=generation
         let request=clientFactory?() ?? ClaudeQuotaClient(allowTrust:setup && manual)
-        client=request;message="Claude: consultando quota…";audit(.query,.started);onChange()
+        client=request;message=L("Claude: consultando quota…");audit(.query,.started);onChange()
         DispatchQueue.global(qos:.utility).async {
             let result=Result{try request.read()}
             DispatchQueue.main.async {[weak self] in

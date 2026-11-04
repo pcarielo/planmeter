@@ -6,7 +6,7 @@ struct ProviderRefreshState {
     let busy:Bool
     static func summary(_ states:[Self],selected:Set<String>)->String {
         let active=states.filter {selected.contains($0.provider)}
-        if active.contains(where:{$0.busy}) {return "Atualizando dados…"}
+        if active.contains(where:{$0.busy}) {return L("Atualizando dados…")}
         return active.compactMap(\.message).filter{!$0.isEmpty}.joined(separator:" · ")
     }
 }

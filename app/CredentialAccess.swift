@@ -66,7 +66,7 @@ enum CredentialAccess {
     }
 
     static func save(_ key:String,service:String,label:String)throws {
-        guard !isTest,!key.isEmpty,key.utf8.count<=4096,key.unicodeScalars.allSatisfy({$0.value>=33 && $0.value<=126}) else{throw QuotaError.message("Chave inválida")}
+        guard !isTest,!key.isEmpty,key.utf8.count<=4096,key.unicodeScalars.allSatisfy({$0.value>=33 && $0.value<=126}) else{throw QuotaError.message(L("Chave inválida"))}
         lock.lock();defer{lock.unlock()}
         let query=baseQuery(service),data=Data(key.utf8)
         let status=withPolicy(interactive:true){
@@ -76,14 +76,14 @@ enum CredentialAccess {
             return SecItemAdd(item as CFDictionary,nil)
         }
         session.record(service,status:status)
-        guard status==errSecSuccess else{throw QuotaError.message("Não foi possível salvar a chave no Keychain")}
+        guard status==errSecSuccess else{throw QuotaError.message(L("Não foi possível salvar a chave no Keychain"))}
         session.saved(service,key:key)
     }
     static func remove(_ service:String)throws {
-        guard !isTest else{throw QuotaError.message("Operação indisponível em teste")}
+        guard !isTest else{throw QuotaError.message(L("Operação indisponível em teste"))}
         lock.lock();defer{lock.unlock()}
         let status=withPolicy(interactive:true){SecItemDelete(baseQuery(service) as CFDictionary)}
-        guard status==errSecSuccess || status==errSecItemNotFound else{throw QuotaError.message("Não foi possível remover a chave do Keychain")}
+        guard status==errSecSuccess || status==errSecItemNotFound else{throw QuotaError.message(L("Não foi possível remover a chave do Keychain"))}
         session.removed(service)
     }
 }
