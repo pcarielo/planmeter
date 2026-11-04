@@ -159,7 +159,7 @@ final class KimiMonitor: NSObject {
     func showFeedback(_ text: String) {
         guard !KimiEnvironment.isTest else{return}
         let alert=NSAlert();alert.messageText="Kimi Code";alert.informativeText=text
-        alert.addButton(withTitle:"OK");NSApp.activate(ignoringOtherApps:true);alert.runModal()
+        alert.addButton(withTitle:L("OK"));NSApp.activate(ignoringOtherApps:true);alert.runModal()
     }
     @objc func removeKey() {
         guard !KimiEnvironment.isTest,!busy else{return}

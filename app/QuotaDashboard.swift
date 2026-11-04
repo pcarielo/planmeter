@@ -29,6 +29,7 @@ final class QuotaDashboardView: NSView {
     var onInsight:()->Void={}
     var onInsightSettings:()->Void={}
     private var insightButton:NSButton?
+    private var insightTitleWidth:CGFloat=0
     @objc private func generateInsight(){onInsight()}
     @objc private func configureInsight(){onInsightSettings()}
     var dismiss: () -> Void = {}
@@ -60,8 +61,11 @@ final class QuotaDashboardView: NSView {
         super.init(frame:NSRect(x:0,y:0,width:width,height:bottom+38+Self.insightHeight(insight,status:insightStatus,width:width)))
         if insightStatus != nil {
             let button=NSButton(title:insightBusy ? L("Gerando…") : L("Gerar insight"),target:self,action:#selector(generateInsight))
-            button.frame=NSRect(x:width-148,y:bottom+24,width:128,height:26);button.bezelStyle = .rounded;button.isEnabled = !insightBusy && insightEnabled;addSubview(button);insightButton=button
-            let settings=NSButton(title:L("Configurar"),target:self,action:#selector(configureInsight));settings.frame=NSRect(x:width-260,y:bottom+24,width:106,height:26);settings.bezelStyle = .rounded;addSubview(settings)
+            let font=NSFont.systemFont(ofSize:13)
+            let actionWidth=max(CGFloat(128),[L("Gerar insight"),L("Gerando…")].map{ceil(($0 as NSString).size(withAttributes:[.font:font]).width)+32}.max() ?? 128)
+            let settingsWidth=max(CGFloat(106),ceil((L("Configurar") as NSString).size(withAttributes:[.font:font]).width)+32)
+            button.frame=NSRect(x:width-20-actionWidth,y:bottom+24,width:actionWidth,height:26);button.font=font;button.bezelStyle = .rounded;button.isEnabled = !insightBusy && insightEnabled;addSubview(button);insightButton=button
+            let settings=NSButton(title:L("Configurar"),target:self,action:#selector(configureInsight));settings.frame=NSRect(x:button.frame.minX-6-settingsWidth,y:bottom+24,width:settingsWidth,height:26);settings.font=font;insightTitleWidth=max(60,settings.frame.minX-42);settings.bezelStyle = .rounded;addSubview(settings)
         }
         for (card,rect) in zip(cards,Self.cardFrames(cards,width:width)) {
             let frame=NSRect(x:rect.minX,y:rect.minY-22,width:rect.width,height:rect.height+22)
@@ -123,7 +127,7 @@ final class QuotaDashboardView: NSView {
             let statusHeight=max(18,Self.insightTextHeight(message,width:bounds.width,size:10))
             let rect=NSRect(x:20,y:bottom+12,width:bounds.width-40,height:Self.insightHeight(insight,status:message,width:bounds.width)-12)
             NSColor.controlBackgroundColor.setFill();NSBezierPath(roundedRect:rect,xRadius:12,yRadius:12).fill()
-            text(L("Insight · últimos 7 dias"),NSRect(x:34,y:bottom+28,width:bounds.width-300,height:22),14,.labelColor,.semibold)
+            text(L("Insight · últimos 7 dias"),NSRect(x:34,y:bottom+28,width:insightTitleWidth,height:22),14,.labelColor,.semibold)
             let paragraph=NSMutableParagraphStyle();paragraph.lineBreakMode = .byWordWrapping
             ((insight ?? L("A análise aparece aqui quando houver um sinal útil no histórico.")) as NSString).draw(in:NSRect(x:34,y:bottom+64,width:bounds.width-68,height:textHeight),withAttributes:[.font:NSFont.systemFont(ofSize:14),.foregroundColor:NSColor.labelColor,.paragraphStyle:paragraph])
             (message as NSString).draw(in:NSRect(x:34,y:bottom+64+textHeight+8,width:bounds.width-68,height:statusHeight),withAttributes:[.font:NSFont.systemFont(ofSize:10),.foregroundColor:NSColor.secondaryLabelColor,.paragraphStyle:paragraph])

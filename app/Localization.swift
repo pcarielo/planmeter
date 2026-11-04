@@ -29,13 +29,14 @@ enum L10n {
               let value=object["language"] as? String,supportedSelections.contains(value) else{return "system"}
         return value
     }()
+    private static let launchCode=resolvedCode(selection:savedSelection,preferredLanguage:Locale.preferredLanguages.first)
     private static let lock=NSRecursiveLock()
     private static var cache:[String:[String:String]]=[:]
     private static var testCode:String?
     static var code:String {
         lock.lock();defer{lock.unlock()}
         if testMode {return testCode ?? "pt-BR"}
-        return resolvedCode(selection:savedSelection,preferredLanguage:Locale.preferredLanguages.first)
+        return launchCode
     }
     static func resolvedCode(selection:String,preferredLanguage:String?)->String {
         if languages.contains(selection){return selection}
@@ -50,6 +51,7 @@ enum L10n {
         return ["en","es","ko","ja","fr","hi"].contains(primary) ? primary : "en"
     }
     static var locale:Locale {Locale(identifier:["en":"en_US","es":"es_ES","pt-BR":"pt_BR","ko":"ko_KR","ja":"ja_JP","fr":"fr_FR","zh-Hant":"zh_TW","hi":"hi_IN"][code] ?? "en_US")}
+    static func decimal(_ value:Double)->String {String(format:"%.1f",locale:locale,value)}
     static var choices:[Choice] {
         [Choice(code:"system",name:L("Idioma do sistema"))]+[
             Choice(code:"en",name:"English"),Choice(code:"es",name:"Español"),Choice(code:"pt-BR",name:"Português"),

@@ -45,8 +45,9 @@ final class AccessSetup: NSObject {
             let label=NSTextField(wrappingLabelWithString:text);label.frame=frame;label.font = .systemFont(ofSize:size,weight:bold ? .semibold : .regular);view.addSubview(label);return label
         }
         _=label(L("Conecte os serviços que você usa"),NSRect(x:22,y:height-48,width:width-44,height:26),21,true)
-        _=label(summary,NSRect(x:22,y:height-90,width:width-158,height:40),13)
-        let upgrade=NSButton(title:L("Sobre o Pro"),target:self,action:#selector(upgrade));upgrade.bezelStyle = .rounded;upgrade.frame=NSRect(x:width-130,y:height-82,width:108,height:28);view.addSubview(upgrade)
+        let upgradeWidth=max(CGFloat(108),ceil((L("Sobre o Pro") as NSString).size(withAttributes:[.font:NSFont.systemFont(ofSize:13)]).width)+32)
+        _=label(summary,NSRect(x:22,y:height-90,width:width-66-upgradeWidth,height:40),13)
+        let upgrade=NSButton(title:L("Sobre o Pro"),target:self,action:#selector(upgrade));upgrade.bezelStyle = .rounded;upgrade.font = .systemFont(ofSize:13);upgrade.frame=NSRect(x:width-22-upgradeWidth,y:height-82,width:upgradeWidth,height:28);view.addSubview(upgrade)
         for (index,provider) in providers.enumerated() {
             let y=height-163-CGFloat(index)*87
             let toggle=NSButton(checkboxWithTitle:"",target:self,action:#selector(togglePlan(_:)))

@@ -10,3 +10,7 @@ func captureFixturePreview(_ view:NSView,name:String) {
     try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
     try! data.write(to:directory.appendingPathComponent(name+".png"),options:.atomic)
 }
+
+final class FixtureCanvas:NSView {
+    override func draw(_ dirtyRect:NSRect) {NSColor.windowBackgroundColor.setFill();bounds.fill()}
+}

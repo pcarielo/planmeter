@@ -102,6 +102,6 @@ final class GrokMonitor: NSObject {
     func showFeedback(_ text:String) {
         guard !GrokEnvironment.isTest else{return}
         let alert=NSAlert();alert.messageText="Grok";alert.informativeText=text
-        alert.addButton(withTitle:"OK");NSApp.activate(ignoringOtherApps:true);alert.runModal()
+        alert.addButton(withTitle:L("OK"));NSApp.activate(ignoringOtherApps:true);alert.runModal()
     }
 }

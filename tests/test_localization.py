@@ -1,4 +1,5 @@
 import json, pathlib, re, unittest
+from _localization_source import scan
 ROOT=pathlib.Path(__file__).resolve().parent.parent
 LANGUAGES={'en','es','pt-BR','ko','ja','fr','zh-Hant','hi'}
 PLACEHOLDER=re.compile(r'%[1-9][0-9]*\$@')
@@ -24,6 +25,26 @@ class CatalogTests(unittest.TestCase):
                     self.assertIsInstance(value,str)
                     self.assertTrue(value.strip())
                     self.assertEqual(sorted(PLACEHOLDER.findall(key)),sorted(PLACEHOLDER.findall(value)))
+    def test_source_messages_have_catalog_entries(self):
+        available=set(self.load(ROOT/'app/Resources/Locales/pt-BR.json'))
+        for path in (ROOT/'app').glob('*.swift'):
+            source=path.read_text()
+            for start,end,parts,expressions in scan(source):
+                if not re.search(r'\bL\(\s*$',source[max(0,start-20):start]):continue
+                key=parts[0]+''.join('%'+str(n+1)+'$@'+parts[n+1] for n in range(len(expressions)))
+                with self.subTest(file=path.name,line=source.count('\n',0,start)+1):self.assertIn(key,available)
+    def test_native_ui_literals_are_explicitly_localized(self):
+        brands={'PlanMeter','Codex','Claude','Claude Code','Kimi Code','Z.ai','Grok','Grok Unified','Prime Agent','OpenCode','MCP','Free','Pro'}
+        pattern=re.compile(r'(?:\b(?:Text|Button|Toggle|Section|Picker|TextField|Label)\(|\b(?:title|withTitle)\s*:)\s*"((?:\\.|[^"\\])*)"')
+        for path in (ROOT/'app').glob('*.swift'):
+            if path.name.endswith('Tests.swift') or path.name in ('Tests.swift','Localization.swift'):continue
+            source=path.read_text()
+            for match in pattern.finditer(source):
+                literal=match.group(1)
+                if not re.search(r'[A-Za-zÀ-ÿ]',literal) or literal in brands:continue
+                self.fail('Unlocalized UI literal in '+path.name+': '+literal)
+        status=(ROOT/'app/ClaudeQuota.swift').read_text()
+        self.assertFalse(re.search(r'return\s+"[^"\n]+"',status),'Claude status messages must use L()')
     def test_embedded_instruction_json_keeps_protocol_fields(self):
         folder=ROOT/'app/Resources/Locales'
         for code in LANGUAGES:
