@@ -89,7 +89,7 @@ func localDate(_ date: Date) -> String {
     f.locale = L10n.locale
     f.timeZone = .current
     f.setLocalizedDateFormatFromTemplate("MMddHHmmssz")
-    return f.string(from: date)
+    let result=f.string(from:date);L10n.rememberDate(result,date:date);return result
 }
 struct RefreshPolicy {
     var baseInterval:TimeInterval=60

@@ -46,6 +46,7 @@
   "A consulta ativa será desativada. O login Claude permanece intacto. Na leitura passiva, Atualizar apenas relê a statusline e pode não trazer quotas recentes.": "सक्रिय क्वेरी बंद हो जाएगी। Claude लॉगिन बना रहेगा। निष्क्रिय पठन में रीफ़्रेश केवल statusline दोबारा पढ़ता है और शायद ताज़ा कोटा न मिले।",
   "A instalação em uso é ": "इस्तेमाल हो रहा इंस्टॉलेशन: ",
   "A integração escolhida ainda não está disponível ou o modelo não foi informado.": "चुना हुआ एकीकरण अभी उपलब्ध नहीं है या मॉडल नहीं बताया गया है।",
+  "A interface muda imediatamente. Sua escolha fica salva.": "इंटरफ़ेस तुरंत बदलता है। आपकी पसंद सेव रहती है।",
   "Abra PlanMeter primeiro, depois use a DEMO no menu.": "पहले PlanMeter खोलें, फिर मेनू का DEMO इस्तेमाल करें।",
   "Abrir Itens de Início do macOS": "macOS के लॉगिन आइटम खोलें",
   "Abrir ao iniciar a sessão": "लॉगिन पर खोलें",

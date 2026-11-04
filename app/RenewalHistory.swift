@@ -137,7 +137,7 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
     var persistenceMessage:String?
     private var summary:NSTextField?
     private(set) var rows:[RenewalEntry]=[]
-    let columns=[("provider",L("Provedor"),110.0),("window",L("Janela"),110),("start",L("Início da janela"),180),("end",L("Próxima renovação"),180),("basis",L("Base do registro"),280),("observed",L("Observado em"),180),("scope",L("Conta"),160)]
+    var columns:[(String,String,Double)] { [("provider",L("Provedor"),110.0),("window",L("Janela"),110),("start",L("Início da janela"),180),("end",L("Próxima renovação"),180),("basis",L("Base do registro"),280),("observed",L("Observado em"),180),("scope",L("Conta"),160)] }
     func update(_ value:RenewalHistory) {history=value;sortRows();summary?.stringValue=persistenceMessage ?? L("\(history.entries.count) registros · datas inferidas não confirmam o instante exato do reset.")}
     func show(_ value:RenewalHistory) {
         if window==nil {
@@ -209,6 +209,18 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
         guard panel.runModal() == .OK,let url=panel.url else{return}
         do {try exportContents().write(to:url,atomically:true,encoding:.utf8)}
         catch {let alert=NSAlert();alert.messageText=L("Não foi possível exportar o histórico");alert.runModal()}
+    }
+    func refreshLanguage() {
+        guard let window=window else{return}
+        window.title=L("Histórico de renovações · PlanMeter")
+        for (key,title,_) in columns {table.tableColumn(withIdentifier:NSUserInterfaceItemIdentifier(key))?.title=title}
+        if let content=window.contentView {
+            for view in content.subviews {
+                if let button=view as? NSButton {button.title=L10n.relocalized(button.title)}
+                if let label=view as? NSTextField {label.stringValue=L10n.relocalized(label.stringValue)}
+            }
+        }
+        update(history)
     }
     func windowWillClose(_ notification:Notification) {if let window=window {refreshUtilityActivation(excluding:window)}}
 }

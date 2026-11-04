@@ -8,7 +8,7 @@ O PlanMeter é um aplicativo Swift/AppKit que mostra o saldo disponível, as jan
 
 ## Idiomas
 
-O aplicativo oferece oito idiomas, com escolha em Configurações → Geral → Idioma da interface. A opção inicial segue o macOS e usa inglês quando o idioma principal não está disponível. [Como escolher e contribuir com traduções](docs/languages.md).
+O aplicativo oferece oito idiomas, com escolha em Configurações → Idioma. A opção inicial segue o macOS e usa inglês quando o idioma principal não está disponível. [Como escolher e contribuir com traduções](docs/languages.md).
 
 ## Painel de quotas
 

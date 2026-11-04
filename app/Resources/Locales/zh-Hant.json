@@ -46,6 +46,7 @@
   "A consulta ativa será desativada. O login Claude permanece intacto. Na leitura passiva, Atualizar apenas relê a statusline e pode não trazer quotas recentes.": "主動查詢將停用。Claude 登入不受影響。被動讀取模式下，重新整理只會重讀 statusline，可能無法取得最新配額。",
   "A instalação em uso é ": "目前使用的安裝位置為：",
   "A integração escolhida ainda não está disponível ou o modelo não foi informado.": "所選整合尚未開放，或尚未指定模型。",
+  "A interface muda imediatamente. Sua escolha fica salva.": "介面會立即切換，並儲存您的選擇。",
   "Abra PlanMeter primeiro, depois use a DEMO no menu.": "請先開啟 PlanMeter，再使用選單中的 DEMO。",
   "Abrir Itens de Início do macOS": "開啟 macOS「登入項目」",
   "Abrir ao iniciar a sessão": "登入時開啟",

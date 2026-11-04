@@ -30,7 +30,7 @@ final class InsightController {
         return InsightBasis.isStale(generatedAt:date,basis:basis,current:current,now:now)
     }
     func status(current:[UsageProjection],now:Date=Date())->String {
-        guard let date=generatedAt else{return message}
+        guard let date=generatedAt else{return L10n.relocalized(message)}
         let source=L("Gerado em ")+localDate(date)+" · "+preferences.harness.title+" / "+preferences.model
         return source+"\n"+(isStale(current:current,now:now) ? L("Dados mudaram; gere um novo insight. ") : "")+message
     }

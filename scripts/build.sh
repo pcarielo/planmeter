@@ -21,7 +21,7 @@ for name in ('configure-claude.py','claude-statusline-wrapper.py','claude-status
     shutil.copy2(root/'scripts'/name,integration/name)
 product_id=os.environ.get('PLANMETER_PRO_PRODUCT_ID','io.github.pcarielo.planmeter.pro')
 if not re.fullmatch(r'[A-Za-z0-9._-]{1,255}',product_id): raise SystemExit('Invalid Pro product identifier.')
-info={'CFBundleIdentifier' :'io.github.pcarielo.planmeter','CFBundleName':'PlanMeter','CFBundleDisplayName':'PlanMeter','CFBundleExecutable':'PlanMeter','CFBundlePackageType':'APPL','CFBundleShortVersionString':'1.8.0','CFBundleVersion':'17','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSHighResolutionCapable':True}
+info={'CFBundleIdentifier' :'io.github.pcarielo.planmeter','CFBundleName':'PlanMeter','CFBundleDisplayName':'PlanMeter','CFBundleExecutable':'PlanMeter','CFBundlePackageType':'APPL','CFBundleShortVersionString':'1.8.1','CFBundleVersion':'18','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSHighResolutionCapable':True}
 info['PlanMeterProProductID']=product_id
 info['CFBundleDevelopmentRegion']='en'
 info['CFBundleLocalizations']=['en','es','pt-BR','ko','ja','fr','zh-Hant','hi']

@@ -1,5 +1,10 @@
 # Alterações
 
+## 1.8.1 - 2026-11-04
+
+- Escolha de idioma em aba própria, preservando a organização anterior de Geral.
+- Interface atualizada imediatamente ao selecionar o idioma, sem reabrir o app nem iniciar consultas.
+
 ## 1.8.0 - 2026-11-04
 
 - Interface em inglês, espanhol, português, coreano, japonês, francês, chinês tradicional e hindi.
