@@ -1,5 +1,9 @@
 # Alterações
 
+## 1.7.1 - 2026-11-04
+
+- Aviso de renovação usa singular e plural por extenso, sem “(s)”.
+
 ## 1.7.0 - 2026-10-29
 
 - O gerador de insights é independente dos planos monitorados; a seleção explica compatibilidade, filtros de catálogo e alterações pendentes.
