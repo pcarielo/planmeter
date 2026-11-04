@@ -557,8 +557,9 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard shownKey != key else { return }
         shownKey = key
         let providers = Set(pending.map { ($0.provider ?? "codex") == "claude" ? "Claude" : "Codex" }).sorted().joined(separator: " + ")
+        let resetDescription = pending.count == 1 ? "1 reset detectado" : "\(pending.count) resets detectados"
         confetti.onAcknowledge = { [weak self] in self?.acknowledge() }
-        confetti.showLoop(message: demoPending ? "DEMO separada. Sem quota/histórico real. Clique neste aviso para dispensar." : "\(providers): \(pending.count) reset(s) detectado(s). Clique neste aviso para reconhecer.", demo: demoPending, motion: motion, display: celebrationDisplay, renderOffscreen: celebrationRenderOffscreen)
+        confetti.showLoop(message: demoPending ? "DEMO separada. Sem quota/histórico real. Clique neste aviso para dispensar." : "\(providers): \(resetDescription). Clique neste aviso para reconhecer.", demo: demoPending, motion: motion, display: celebrationDisplay, renderOffscreen: celebrationRenderOffscreen)
     }
     @objc func acknowledge() {
         if demoPending { demoPending = false; demoMotion = false }
