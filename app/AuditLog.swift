@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 
 enum AuditCategory:String,CaseIterable,Codable {case queries,configuration,access
-    var title:String {switch self {case .queries:return "Consultas";case .configuration:return "Configurações";case .access:return "Acessos e chaves"}}
+    var title:String {switch self {case .queries:return L("Consultas");case .configuration:return L("Configurações");case .access:return L("Acessos e chaves")}}
 }
 enum AuditProvider:String,Codable {case app,codex,claude,zai,kimi,grok}
 enum AuditAction:String,Codable {case query,readCache,settingsChanged,saveKey,removeKey,authorize}
@@ -32,12 +32,12 @@ final class AuditLog {
         guard category != .queries || options.queries,
               category != .configuration || options.configuration,
               category != .access || options.access else{return true}
-        warning=availableBytes(directory.deletingLastPathComponent()).map{$0<104_857_600 ? "Pouco espaço em disco. Os registros dentro da retenção serão preservados." : nil} ?? nil
+        warning=availableBytes(directory.deletingLastPathComponent()).map{$0<104_857_600 ? L("Pouco espaço em disco. Os registros dentro da retenção serão preservados.") : nil} ?? nil
         do {
             if simulateWriteFailure {throw StorageFailure()}
             try append(category,event:AuditEvent(timestamp:now.timeIntervalSince1970,provider:provider,action:action,outcome:outcome),options:options,now:now)
             lastError=nil;return true
-        } catch {lastError="Não foi possível gravar os registros locais. Confira espaço e permissões da pasta de logs.";return false}
+        } catch {lastError=L("Não foi possível gravar os registros locais. Confira espaço e permissões da pasta de logs.");return false}
     }
     private struct StorageFailure:Error {}
     private func append(_ category:AuditCategory,event:AuditEvent,options:OperationsSettings,now:Date)throws {

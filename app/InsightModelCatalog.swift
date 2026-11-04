@@ -25,10 +25,10 @@ struct InsightModelCatalog {
     }
     static func resultMessage(models:[String],data:Data,harness:InsightHarness,provider:String)->String {
         let title=InsightHarness.providerTitle(provider)
-        if !models.isEmpty {return "\(models.count) modelo(s) de \(title) encontrado(s) em \(harness.title). Selecione um e aplique as opções."}
+        if !models.isEmpty {return L("\(models.count) modelo(s) de \(title) encontrado(s) em \(harness.title). Selecione um e aplique as opções.")}
         let alternatives=availableProviders(data,harness:harness).filter{$0 != provider}.map{InsightHarness.providerTitle($0)}
-        if !alternatives.isEmpty {return "O catálogo de \(harness.title) não retornou modelos de \(title). Encontrou: \(alternatives.joined(separator:", ")). Escolha o provedor correspondente acima."}
-        return "O catálogo de \(harness.title) não retornou modelos de \(title). Confira a configuração desse provedor no cliente; nenhuma credencial foi alterada."
+        if !alternatives.isEmpty {return L("O catálogo de \(harness.title) não retornou modelos de \(title). Encontrou: \(alternatives.joined(separator:", ")). Escolha o provedor correspondente acima.")}
+        return L("O catálogo de \(harness.title) não retornou modelos de \(title). Confira a configuração desse provedor no cliente; nenhuma credencial foi alterada.")
     }
     static func piModels(_ data:Data,provider:String)->[String] {
         guard let text=catalogText(data) else{return []}

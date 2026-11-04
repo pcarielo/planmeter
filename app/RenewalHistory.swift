@@ -15,9 +15,10 @@ struct RenewalEntry: Codable, Equatable {
     var detectedBetweenReadings=false
     var inferenceAdjusted=false
     var evidence:String {
-        (detectedBetweenReadings ? "Detectado entre leituras · " : "") + (startReported ? "início informado" : "início inferido") + (inferenceAdjusted && !detectedBetweenReadings && !startReported ? " · prazo alterado" : "")
+        (detectedBetweenReadings ? L("Detectado entre leituras · ") : "") + (startReported ? L("início informado") : L("início inferido")) + (inferenceAdjusted && !detectedBetweenReadings && !startReported ? L(" · prazo alterado") : "")
     }
-    var scopeLabel:String {identity.map {"Conta "+String($0.prefix(8))} ?? "Conta não identificada"}
+    var scopeLabel:String {identity.map {L("Conta ")+String($0.prefix(8))} ?? L("Conta não identificada")}
+    var displayWindow:String {quotaWindowLabel(QuotaWindow(name:window,remaining:nil,durationMinutes:minutes,reset:endsAt))}
     var providerName:String { ["codex":"Codex","claude":"Claude","zai":"Z.ai","kimi":"Kimi Code","grok":"Grok"][provider] ?? provider }
 }
 extension RenewalEntry {
@@ -79,7 +80,7 @@ struct RenewalHistory: Codable {
             let reported=window.startedAt
             let inferred=window.durationMinutes.flatMap {$0>0 ? end-Double($0)*60 : nil}
             guard let start=reported ?? inferred,start.isFinite,start>=946684800,start<end,start<=snapshot.queriedAt.timeIntervalSince1970+5 else{continue}
-            let row=RenewalEntry(provider:snapshot.effectiveProvider,bucket:snapshot.bucketID ?? "unknown",identity:snapshot.identityFingerprint,window:QuotaCard.windowLabel(window),minutes:window.durationMinutes,startedAt:start,endsAt:end,recordedAt:snapshot.queriedAt,startReported:reported != nil)
+            let row=RenewalEntry(provider:snapshot.effectiveProvider,bucket:snapshot.bucketID ?? "unknown",identity:snapshot.identityFingerprint,window:quotaWindowIdentityLabel(window),minutes:window.durationMinutes,startedAt:start,endsAt:end,recordedAt:snapshot.queriedAt,startReported:reported != nil)
             changed=merge(row) || changed
         }
         return changed
@@ -88,7 +89,7 @@ struct RenewalHistory: Codable {
         guard record.durationMinutes>0,record.serviceResetAt.isFinite else{return false}
         let start=record.serviceResetAt-Double(record.durationMinutes)*60
         guard start>=946684800,start<record.serviceResetAt,start<=record.detectedAt.timeIntervalSince1970+180 else{return false}
-        let label=QuotaCard.windowLabel(QuotaWindow(name:record.window,remaining:nil,durationMinutes:record.durationMinutes,reset:record.serviceResetAt))
+        let label=quotaWindowIdentityLabel(QuotaWindow(name:record.window,remaining:nil,durationMinutes:record.durationMinutes,reset:record.serviceResetAt))
         return merge(RenewalEntry(provider:record.provider ?? "codex",bucket:record.bucketID,identity:record.identityFingerprint,window:label,minutes:record.durationMinutes,startedAt:start,endsAt:record.serviceResetAt,recordedAt:record.detectedAt,detectedBetweenReadings:true))
     }
     static func csvCell(_ value:String)->String {
@@ -98,25 +99,25 @@ struct RenewalHistory: Codable {
     }
     func csv(exportRows:[RenewalEntry]?=nil)->String {
         let date=ISO8601DateFormatter()
-        let header=["Provedor","Janela","Início da janela","Próxima renovação","Base do registro","Observado em","Conta identificada","Referência da conta"]
-        let rows=(exportRows ?? ordered).map {row in [row.providerName,row.window,date.string(from:Date(timeIntervalSince1970:row.startedAt)),date.string(from:Date(timeIntervalSince1970:row.endsAt)),row.evidence,date.string(from:row.recordedAt),row.identity == nil ? "Não" : "Sim",row.scopeLabel]}
+        let header=[L("Provedor"),L("Janela"),L("Início da janela"),L("Próxima renovação"),L("Base do registro"),L("Observado em"),L("Conta identificada"),L("Referência da conta")]
+        let rows=(exportRows ?? ordered).map {row in [row.providerName,row.displayWindow,date.string(from:Date(timeIntervalSince1970:row.startedAt)),date.string(from:Date(timeIntervalSince1970:row.endsAt)),row.evidence,date.string(from:row.recordedAt),row.identity == nil ? L("Não") : L("Sim"),row.scopeLabel]}
         return ([header]+rows).map {$0.map(Self.csvCell).joined(separator:",")}.joined(separator:"\r\n")+"\r\n"
     }
     func menu(target:AnyObject,action:Selector)->NSMenu {
         let menu=NSMenu()
-        let open=NSMenuItem(title:"Histórico…",action:action,keyEquivalent:"");open.target=target;menu.addItem(open)
+        let open=NSMenuItem(title:L("Histórico…"),action:action,keyEquivalent:"");open.target=target;menu.addItem(open)
         menu.addItem(NSMenuItem.separator())
-        let note=NSMenuItem(title:"Últimos 5 por provedor · datas inferidas são identificadas",action:nil,keyEquivalent:"");menu.addItem(note)
+        let note=NSMenuItem(title:L("Últimos 5 por provedor · datas inferidas são identificadas"),action:nil,keyEquivalent:"");menu.addItem(note)
         for provider in Self.providers {
             let name=["codex":"Codex","claude":"Claude","zai":"Z.ai","kimi":"Kimi Code","grok":"Grok"][provider]!
             let parent=NSMenuItem(title:name,action:nil,keyEquivalent:"");let sub=NSMenu()
             let rows=recent(provider)
-            if rows.isEmpty {sub.addItem(NSMenuItem(title:"Aguardando início ou duração de janela conhecidos",action:nil,keyEquivalent:""))}
+            if rows.isEmpty {sub.addItem(NSMenuItem(title:L("Aguardando início ou duração de janela conhecidos"),action:nil,keyEquivalent:""))}
             for row in rows {
-                let tag=row.detectedBetweenReadings ? "detectado" : row.startReported ? "informado" : row.inferenceAdjusted ? "inferido · prazo alterado" : "inferido"
-                let title=row.window+" · "+localDate(Date(timeIntervalSince1970:row.startedAt))+" · "+tag
+                let tag=row.detectedBetweenReadings ? L("detectado") : row.startReported ? L("informado") : row.inferenceAdjusted ? L("inferido · prazo alterado") : L("inferido")
+                let title=row.displayWindow+" · "+localDate(Date(timeIntervalSince1970:row.startedAt))+" · "+tag
                 let item=NSMenuItem(title:title,action:nil,keyEquivalent:"");let detail=NSMenu()
-                for text in [row.evidence,"Próxima renovação: "+localDate(Date(timeIntervalSince1970:row.endsAt)),"Observado em: "+localDate(row.recordedAt),row.scopeLabel] {detail.addItem(NSMenuItem(title:text,action:nil,keyEquivalent:""))}
+                for text in [row.evidence,L("Próxima renovação: ")+localDate(Date(timeIntervalSince1970:row.endsAt)),L("Observado em: ")+localDate(row.recordedAt),row.scopeLabel] {detail.addItem(NSMenuItem(title:text,action:nil,keyEquivalent:""))}
                 item.submenu=detail;sub.addItem(item)
             }
             parent.submenu=sub;parent.representedObject=provider;menu.addItem(parent)
@@ -136,21 +137,21 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
     var persistenceMessage:String?
     private var summary:NSTextField?
     private(set) var rows:[RenewalEntry]=[]
-    let columns=[("provider","Provedor",110.0),("window","Janela",110),("start","Início da janela",180),("end","Próxima renovação",180),("basis","Base do registro",280),("observed","Observado em",180),("scope","Conta",160)]
-    func update(_ value:RenewalHistory) {history=value;sortRows();summary?.stringValue=persistenceMessage ?? "\(history.entries.count) registros · datas inferidas não confirmam o instante exato do reset."}
+    let columns=[("provider",L("Provedor"),110.0),("window",L("Janela"),110),("start",L("Início da janela"),180),("end",L("Próxima renovação"),180),("basis",L("Base do registro"),280),("observed",L("Observado em"),180),("scope",L("Conta"),160)]
+    func update(_ value:RenewalHistory) {history=value;sortRows();summary?.stringValue=persistenceMessage ?? L("\(history.entries.count) registros · datas inferidas não confirmam o instante exato do reset.")}
     func show(_ value:RenewalHistory) {
         if window==nil {
             let width=min(1100,NSScreen.main?.visibleFrame.width ?? 1100)-40
             let w=NSWindow(contentRect:NSRect(x:0,y:0,width:width,height:600),styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
-            w.title="Histórico de renovações · PlanMeter";w.isReleasedWhenClosed=false;w.delegate=self;w.minSize=NSSize(width:700,height:400)
+            w.title=L("Histórico de renovações · PlanMeter");w.isReleasedWhenClosed=false;w.delegate=self;w.minSize=NSSize(width:700,height:400)
             let content=NSView(frame:NSRect(x:0,y:0,width:width,height:600));w.contentView=content
-            let title=NSTextField(labelWithString:"Histórico completo");title.font = .systemFont(ofSize:21,weight:.semibold);title.frame=NSRect(x:20,y:554,width:400,height:28);title.autoresizingMask=[.minYMargin];content.addSubview(title)
+            let title=NSTextField(labelWithString:L("Histórico completo"));title.font = .systemFont(ofSize:21,weight:.semibold);title.frame=NSRect(x:20,y:554,width:400,height:28);title.autoresizingMask=[.minYMargin];content.addSubview(title)
             let note=NSTextField(labelWithString:"");note.font = .systemFont(ofSize:13);note.textColor = .secondaryLabelColor;note.frame=NSRect(x:20,y:528,width:width-200,height:22);note.autoresizingMask=[.width,.minYMargin];content.addSubview(note);summary=note
-            let export=NSButton(title:"Exportar CSV…",target:self,action:#selector(exportCSV));export.bezelStyle = .rounded;export.frame=NSRect(x:width-170,y:550,width:150,height:30);export.autoresizingMask=[.minXMargin,.minYMargin];content.addSubview(export)
+            let export=NSButton(title:L("Exportar CSV…"),target:self,action:#selector(exportCSV));export.bezelStyle = .rounded;export.frame=NSRect(x:width-170,y:550,width:150,height:30);export.autoresizingMask=[.minXMargin,.minYMargin];content.addSubview(export)
             for (key,title,width) in columns {let col=NSTableColumn(identifier:NSUserInterfaceItemIdentifier(key));col.title=title;col.width=width;col.sortDescriptorPrototype=NSSortDescriptor(key:key,ascending:!["start","end","observed"].contains(key));table.addTableColumn(col)}
             table.sortDescriptors=[NSSortDescriptor(key:"start",ascending:false)]
             table.delegate=self;table.dataSource=self;table.rowHeight=30;table.usesAlternatingRowBackgroundColors=true;table.allowsMultipleSelection=true
-            table.setAccessibilityLabel("Histórico completo de renovações")
+            table.setAccessibilityLabel(L("Histórico completo de renovações"))
             let scroll=NSScrollView(frame:NSRect(x:20,y:20,width:width-40,height:496));scroll.autoresizingMask=[.width,.height];scroll.hasVerticalScroller=true;scroll.hasHorizontalScroller=true;scroll.documentView=table;content.addSubview(scroll)
             w.center();window=w
         }
@@ -164,7 +165,7 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
             case "end":return number(a.endsAt,b.endsAt)
             case "observed":return number(a.recordedAt.timeIntervalSince1970,b.recordedAt.timeIntervalSince1970)
             case "provider":return a.providerName.localizedStandardCompare(b.providerName)
-            case "window":return a.window.localizedStandardCompare(b.window)
+            case "window":return a.displayWindow.localizedStandardCompare(b.displayWindow)
             case "basis":return a.evidence.localizedStandardCompare(b.evidence)
             case "scope":return a.scopeLabel.localizedStandardCompare(b.scopeLabel)
             default:return .orderedSame
@@ -192,14 +193,14 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
         let text:String
         switch key {
         case "provider":text=value.providerName
-        case "window":text=value.window
+        case "window":text=value.displayWindow
         case "start":text=localDate(Date(timeIntervalSince1970:value.startedAt))
         case "end":text=localDate(Date(timeIntervalSince1970:value.endsAt))
         case "basis":text=value.evidence
         case "scope":text=value.scopeLabel
         default:text=localDate(value.recordedAt)
         }
-        let field=NSTextField(labelWithString:text);field.font = .systemFont(ofSize:13);field.lineBreakMode = .byTruncatingTail;field.toolTip=text+(value.identity == nil ? " · conta não identificada pela fonte" : "");return field
+        let field=NSTextField(labelWithString:text);field.font = .systemFont(ofSize:13);field.lineBreakMode = .byTruncatingTail;field.toolTip=text+(value.identity == nil ? L(" · conta não identificada pela fonte") : "");return field
     }
     func exportContents()->String {"\u{FEFF}"+history.csv(exportRows:rows)}
     @objc func exportCSV() {
@@ -207,7 +208,7 @@ final class RenewalHistoryWindow:NSObject,NSWindowDelegate,NSTableViewDataSource
         let panel=NSSavePanel();panel.allowedContentTypes=[.commaSeparatedText];panel.nameFieldStringValue="planmeter-historico.csv"
         guard panel.runModal() == .OK,let url=panel.url else{return}
         do {try exportContents().write(to:url,atomically:true,encoding:.utf8)}
-        catch {let alert=NSAlert();alert.messageText="Não foi possível exportar o histórico";alert.runModal()}
+        catch {let alert=NSAlert();alert.messageText=L("Não foi possível exportar o histórico");alert.runModal()}
     }
     func windowWillClose(_ notification:Notification) {if let window=window {refreshUtilityActivation(excluding:window)}}
 }
@@ -264,7 +265,7 @@ func runRenewalHistoryTests() {
     check((try? JSONDecoder().decode(RenewalEntry.self,from:JSONSerialization.data(withJSONObject:legacy))) != nil,"optional metadata does not invalidate an old entry")
     for key in ["provider","window","start","end","basis","observed","scope"] {
         var low=history.entries[0],high=history.entries[0]
-        low.id="a";high.id="b";low.provider="claude";high.provider="zai";low.window="5 horas";high.window="Semanal"
+        low.id="a";high.id="b";low.provider="claude";high.provider="zai";low.window="5 horas";high.window="Semanal";low.minutes=300;high.minutes=10080
         low.startedAt=1700000000;high.startedAt=1800000000;low.endsAt=1700010000;high.endsAt=1800010000
         low.recordedAt=Date(timeIntervalSince1970:1700000000);high.recordedAt=now
         low.identity="a";high.identity="z";low.startReported=false;high.startReported=true

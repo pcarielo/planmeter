@@ -13,9 +13,9 @@ func parseZai(_ data: Data, now: Date = Date()) throws -> ZaiReading {
     guard data.count <= 65536, let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any],
           raw["source"] as? String == "zai-official-quota", raw["host"] as? String == "local-mac",
           let time = number(raw["queriedAt"]), time > 0, time <= now.timeIntervalSince1970 + 5,
-          let status = raw["status"] as? String, ["ok","test_mode","auth_unavailable","unauthorized","rate_limited","unavailable"].contains(status) else { throw QuotaError.message("Quota Z.ai sem origem verificável") }
+          let status = raw["status"] as? String, ["ok","test_mode","auth_unavailable","unauthorized","rate_limited","unavailable"].contains(status) else { throw QuotaError.message(L("Quota Z.ai sem origem verificável")) }
     let rows = raw["limits"] as? [[String: Any]] ?? []
-    guard rows.count <= 32 else { throw QuotaError.message("Quota Z.ai excessiva") }
+    guard rows.count <= 32 else { throw QuotaError.message(L("Quota Z.ai excessiva")) }
     var windows: [QuotaWindow] = []
     var seen = Set<String>()
     if status == "ok" {
@@ -24,7 +24,7 @@ func parseZai(_ data: Data, now: Date = Date()) throws -> ZaiReading {
             let unit = number(row["unit"]), count = number(row["number"])
             let metadata = unit.map { $0 >= 1 && $0 <= 10 && $0.rounded() == $0 } == true && count.map { $0 >= 1 && $0 <= 366 && $0.rounded() == $0 } == true
             let identity = metadata ? "\(type):\(unit!):\(count!)" : type
-            guard seen.insert(identity).inserted else { throw QuotaError.message("Quota Z.ai duplicada") }
+            guard seen.insert(identity).inserted else { throw QuotaError.message(L("Quota Z.ai duplicada")) }
             let used = number(row["percentage"]).flatMap { (0...100).contains($0) ? $0 : nil }
             let tokenWindow = type == "TOKENS_LIMIT" || type == "CREDIT_LIMIT"
             let minutes: Int? = tokenWindow && unit == 3 && count == 5 ? 300 : tokenWindow && unit == 6 && count == 1 ? 10080 : nil
@@ -38,14 +38,14 @@ func parseZai(_ data: Data, now: Date = Date()) throws -> ZaiReading {
     return ZaiReading(snapshot: snapshot, status: status, retryAfter: number(raw["retryAfter"]).flatMap { $0 >= 0 && $0 <= 86400 ? $0 : nil }, nextAttemptAt: number(raw["nextAttemptAt"]).flatMap { $0 >= time && $0 <= time + 86400 ? $0 : nil })
 }
 func zaiStatus(_ reading: ZaiReading?) -> String {
-    guard let reading = reading else { return "Autenticação Z.ai ainda não vinculada" }
+    guard let reading = reading else { return L("Autenticação Z.ai ainda não vinculada") }
     switch reading.status {
-    case "ok": return reading.snapshot.windows.isEmpty ? "Servidor não informou janelas reconhecidas" : ""
-    case "test_mode": return "Serviço em teste; cadastro privado da chave Z.ai pendente"
-    case "auth_unavailable": return "Chave ausente ou Keychain bloqueado; configure Z.ai no menu"
-    case "unauthorized": return "Z.ai recusou autenticação; sem tentativa de login"
-    case "rate_limited": return "Z.ai limitou consultas; aguarde cooldown"
-    default: return "Consulta Z.ai indisponível; última quota preservada"
+    case "ok": return reading.snapshot.windows.isEmpty ? L("Servidor não informou janelas reconhecidas") : ""
+    case "test_mode": return L("Serviço em teste; cadastro privado da chave Z.ai pendente")
+    case "auth_unavailable": return L("Chave ausente ou Keychain bloqueado; configure Z.ai no menu")
+    case "unauthorized": return L("Z.ai recusou autenticação; sem tentativa de login")
+    case "rate_limited": return L("Z.ai limitou consultas; aguarde cooldown")
+    default: return L("Consulta Z.ai indisponível; última quota preservada")
     }
 }
 

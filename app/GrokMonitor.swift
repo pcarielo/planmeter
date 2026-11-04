@@ -33,7 +33,7 @@ final class GrokMonitor: NSObject {
             try JSONEncoder().encode(value).write(to:path,options:.atomic)
             try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:path.path)
             return true
-        } catch { message = "Grok: não foi possível salvar o estado local"; return false }
+        } catch { message = L("Grok: não foi possível salvar o estado local"); return false }
     }
     func load() {
         if let data = try? Data(contentsOf:cacheFile),data.count <= 65536, let cached = try? JSONDecoder().decode(GrokCache.self,from:data) {
@@ -55,7 +55,7 @@ final class GrokMonitor: NSObject {
     func setPaused(_ value: Bool) {
         paused=value
         if value {
-            if busy {message="Grok: consulta interrompida pela pausa"}
+            if busy {message=L("Grok: consulta interrompida pela pausa")}
             generation += 1;client?.cancel();client=nil;busy=false;timer?.invalidate();timer=nil;onChange()
         } else {start()}
     }
@@ -63,17 +63,17 @@ final class GrokMonitor: NSObject {
     @objc func refreshNow() { refresh(manual:true) }
     func refresh(manual: Bool) {
         guard enabled,!paused else { return }
-        if busy { if manual {message="Grok: uma consulta já está em andamento";onChange()};return }
+        if busy { if manual {message=L("Grok: uma consulta já está em andamento");onChange()};return }
         let now=Date()
         if now < schedule.manual {
-            if manual {message="Grok: aguarde \(max(1,Int(ceil(schedule.manual.timeIntervalSince(now)))))s para consultar";onChange()}
+            if manual {message=L("Grok: aguarde \(max(1,Int(ceil(schedule.manual.timeIntervalSince(now)))))s para consultar");onChange()}
             return
         }
         guard manual || now >= schedule.automatic else {return}
         schedule=GrokSchedule(manual:now.addingTimeInterval(60),automatic:now.addingTimeInterval(automaticInterval))
         guard save(schedule,to:scheduleFile) else { onChange();return }
         busy=true;requests += 1;generation += 1;let token=generation
-        message="Grok: consultando quota…"
+        message=L("Grok: consultando quota…")
         let request=clientFactory();client=request;audit(.query,.started);onChange()
         DispatchQueue.global(qos:.utility).async {
             let result=Result {try request.read()}
@@ -86,16 +86,16 @@ final class GrokMonitor: NSObject {
                     self.reading=value
                     self.schedule.manual=max(self.schedule.manual,value.nextAttemptAt)
                     self.schedule.automatic=max(self.schedule.automatic,self.schedule.manual)
-                    if value.status=="ok" {self.snapshot=value.snapshot;self.message="Grok: coleta concluída às " + localDate(value.snapshot.queriedAt)}
+                    if value.status=="ok" {self.snapshot=value.snapshot;self.message=L("Grok: coleta concluída às ") + localDate(value.snapshot.queriedAt)}
                     else {self.message=grokStatus(value.status)}
                 case .failure:
                     var empty=QuotaSnapshot(queriedAt:now,windows:[]);empty.provider="grok"
                     self.reading=GrokReading(snapshot:empty,status:"unavailable",nextAttemptAt:self.schedule.manual)
-                    self.message="Grok: consulta falhou; última quota preservada"
+                    self.message=L("Grok: consulta falhou; última quota preservada")
                 }
                 self.save(GrokCache(reading:self.reading,lastGood:self.snapshot),to:self.cacheFile)
                 self.save(self.schedule,to:self.scheduleFile);self.onChange()
-                if manual, self.reading?.status != "ok" { self.showFeedback(self.message ?? "Grok: consulta indisponível") }
+                if manual, self.reading?.status != "ok" { self.showFeedback(self.message ?? L("Grok: consulta indisponível")) }
             }
         }
     }

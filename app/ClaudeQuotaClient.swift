@@ -16,16 +16,16 @@ final class ClaudeQuotaClient {
     func cancel(){lock.lock();cancelled=true;let probe=probe;lock.unlock();probe?.cancel()}
     func read(now:Date=Date())throws->ClaudeQuotaReading {
         lock.lock();let stopped=cancelled;lock.unlock()
-        guard !stopped else{throw QuotaError.message("Consulta Claude cancelada")}
+        guard !stopped else{throw QuotaError.message(L("Consulta Claude cancelada"))}
         if let transport=transport {return try transport()}
-        guard !Runtime.isTest else{throw QuotaError.message("Cliente real bloqueado em testes")}
+        guard !Runtime.isTest else{throw QuotaError.message(L("Cliente real bloqueado em testes"))}
         let discovery=HarnessDiscovery(home:FileManager.default.homeDirectoryForCurrentUser.path,environment:ProcessInfo.processInfo.environment)
         guard let binary=discovery.resolve(.claude) else {
             var snapshot=QuotaSnapshot(queriedAt:now,windows:[]);snapshot.provider="claude"
             return ClaudeQuotaReading(snapshot:snapshot,status:"client_unavailable",nextAttemptAt:now.addingTimeInterval(60))
         }
         let reader=ClaudeCLIProbe(binary:binary,directory:Self.directory)
-        lock.lock();if cancelled {lock.unlock();throw QuotaError.message("Consulta Claude cancelada")};probe=reader;lock.unlock()
+        lock.lock();if cancelled {lock.unlock();throw QuotaError.message(L("Consulta Claude cancelada"))};probe=reader;lock.unlock()
         defer{lock.lock();probe=nil;lock.unlock()}
         return try reader.read(allowTrust:allowTrust)
     }

@@ -11,9 +11,9 @@ struct QuotaCard {
     }
     var detail:String? {
         if key=="claude",snapshot.sourceHost != "claude-code-cli" {
-            return stale ? "Aguardando atualização do Claude Code" : "Leitura passiva do Claude Code"
+            return stale ? L("Aguardando atualização do Claude Code") : L("Leitura passiva do Claude Code")
         }
-        let parts=[stale ? "Dados desatualizados" : nil,note].compactMap {$0}
+        let parts=[stale ? L("Dados desatualizados") : nil,note].compactMap {$0}
         return parts.isEmpty ? nil : parts.joined(separator:" · ")
     }
     var deliveryDate:Date {snapshot.receivedAt ?? snapshot.queriedAt}
@@ -51,7 +51,7 @@ final class QuotaDashboardView: NSView {
     }
     static func insightHeight(_ text:String?,status:String?,width:CGFloat)->CGFloat {
         guard let status=status else{return 0}
-        return max(160,64+max(40,insightTextHeight(text ?? "A análise aparece aqui quando houver um sinal útil no histórico.",width:width,size:14))+8+max(18,insightTextHeight(status,width:width,size:10))+16)
+        return max(160,64+max(40,insightTextHeight(text ?? L("A análise aparece aqui quando houver um sinal útil no histórico."),width:width,size:14))+8+max(18,insightTextHeight(status,width:width,size:10))+16)
     }
     init(cards: [QuotaCard], width: CGFloat,insight:String?=nil,insightStatus:String?=nil,insightBusy:Bool=false,insightEnabled:Bool=true,refreshStates:[String:CardRefreshStatus]=[:]) {
         self.insight=insight;self.insightStatus=insightStatus
@@ -59,9 +59,9 @@ final class QuotaDashboardView: NSView {
         let bottom=Self.cardFrames(cards,width:width).map(\.maxY).max() ?? 112
         super.init(frame:NSRect(x:0,y:0,width:width,height:bottom+38+Self.insightHeight(insight,status:insightStatus,width:width)))
         if insightStatus != nil {
-            let button=NSButton(title:insightBusy ? "Gerando…" : "Gerar insight",target:self,action:#selector(generateInsight))
+            let button=NSButton(title:insightBusy ? L("Gerando…") : L("Gerar insight"),target:self,action:#selector(generateInsight))
             button.frame=NSRect(x:width-148,y:bottom+24,width:128,height:26);button.bezelStyle = .rounded;button.isEnabled = !insightBusy && insightEnabled;addSubview(button);insightButton=button
-            let settings=NSButton(title:"Configurar",target:self,action:#selector(configureInsight));settings.frame=NSRect(x:width-260,y:bottom+24,width:106,height:26);settings.bezelStyle = .rounded;addSubview(settings)
+            let settings=NSButton(title:L("Configurar"),target:self,action:#selector(configureInsight));settings.frame=NSRect(x:width-260,y:bottom+24,width:106,height:26);settings.bezelStyle = .rounded;addSubview(settings)
         }
         for (card,rect) in zip(cards,Self.cardFrames(cards,width:width)) {
             let frame=NSRect(x:rect.minX,y:rect.minY-22,width:rect.width,height:rect.height+22)
@@ -78,10 +78,10 @@ final class QuotaDashboardView: NSView {
             let freshness = card.detail.map {", "+$0} ?? ""
             return card.name + freshness + ": " + windows.joined(separator:", ")
         }
-        var accessibility="Quotas disponíveis. " + summaries.joined(separator:". ")
+        var accessibility=L("Quotas disponíveis. ") + summaries.joined(separator:". ")
         if let status=insightStatus {
-            let text=insight ?? "Ainda não gerado"
-            accessibility += ". Insight: \(text). \(status)"
+            let text=insight ?? L("Ainda não gerado")
+            accessibility += L(". Insight: \(text). \(status)")
         }
         setAccessibilityLabel(accessibility)
     }
@@ -93,16 +93,16 @@ final class QuotaDashboardView: NSView {
     }
     override func draw(_ dirtyRect:NSRect) {
         NSColor.windowBackgroundColor.setFill();bounds.fill()
-        text("Disponibilidade",NSRect(x:20,y:18,width:bounds.width-40,height:26),20,.labelColor,.semibold)
-        text("Saldo restante por janela de uso",NSRect(x:20,y:46,width:bounds.width-40,height:18),12,.secondaryLabelColor)
-        if cards.isEmpty { text("Nenhuma métrica disponível no momento.",NSRect(x:20,y:88,width:bounds.width-40,height:24),13,.secondaryLabelColor) }
+        text(L("Disponibilidade"),NSRect(x:20,y:18,width:bounds.width-40,height:26),20,.labelColor,.semibold)
+        text(L("Saldo restante por janela de uso"),NSRect(x:20,y:46,width:bounds.width-40,height:18),12,.secondaryLabelColor)
+        if cards.isEmpty { text(L("Nenhuma métrica disponível no momento."),NSRect(x:20,y:88,width:bounds.width-40,height:24),13,.secondaryLabelColor) }
         for (card,rect) in zip(cards,Self.cardFrames(cards,width:bounds.width)) {
                 let x=rect.minX,y=rect.minY,width=rect.width
                 NSColor.labelColor.withAlphaComponent(0.055).setFill();NSBezierPath(roundedRect:rect,xRadius:12,yRadius:12).fill()
                 NSColor.separatorColor.withAlphaComponent(0.35).setStroke();NSBezierPath(roundedRect:rect.insetBy(dx:0.5,dy:0.5),xRadius:12,yRadius:12).stroke()
                 if let icon=StatusPresentation.icons[card.key] { icon.draw(in:NSRect(x:x+14,y:y+14,width:20,height:20),from:.zero,operation:.sourceOver,fraction:1,respectFlipped:true,hints:nil) }
                 text(card.name,NSRect(x:x+42,y:y+14,width:width-54,height:22),15,.labelColor,.semibold)
-                text("Atualizado em " + localDate(card.deliveryDate),NSRect(x:x+14,y:y+42,width:width-28,height:18),11,.secondaryLabelColor)
+                text(L("Atualizado em ") + localDate(card.deliveryDate),NSRect(x:x+14,y:y+42,width:width-28,height:18),11,.secondaryLabelColor)
                 for (index,window) in card.windows.enumerated() {
                     let top=y+76+CGFloat(index)*96, remaining=window.remaining!
                     let label=QuotaCard.windowLabel(window)
@@ -112,23 +112,23 @@ final class QuotaDashboardView: NSView {
                     NSColor.quaternaryLabelColor.setFill();NSBezierPath(roundedRect:track,xRadius:2.5,yRadius:2.5).fill()
                     (remaining <= 10 ? NSColor.systemRed : remaining <= 25 ? NSColor.systemOrange : NSColor.systemGreen).setFill()
                     if remaining>0 {NSBezierPath(roundedRect:NSRect(x:track.minX,y:track.minY,width:track.width*remaining/100,height:5),xRadius:2.5,yRadius:2.5).fill()}
-                    text(window.reset.map { "Renovação: " + localDate(Date(timeIntervalSince1970:$0)) } ?? "Renovação não informada",NSRect(x:x+14,y:top+37,width:width-28,height:18),10,.secondaryLabelColor)
+                    text(window.reset.map { L("Renovação: ") + localDate(Date(timeIntervalSince1970:$0)) } ?? L("Renovação não informada"),NSRect(x:x+14,y:top+37,width:width-28,height:18),10,.secondaryLabelColor)
                     if window.reset != nil { text(countdownLabel(reset:window.reset),NSRect(x:x+14,y:top+54,width:width-28,height:18),10,.secondaryLabelColor) }
                 }
                 if let detail=card.detail {text(detail,NSRect(x:x+14,y:rect.maxY-26,width:width-28,height:18),11,card.stale ? .systemOrange : .secondaryLabelColor)}
         }
         if let message=insightStatus {
             let bottom=Self.cardFrames(cards,width:bounds.width).map(\.maxY).max() ?? 112
-            let textHeight=max(40,Self.insightTextHeight(insight ?? "A análise aparece aqui quando houver um sinal útil no histórico.",width:bounds.width,size:14))
+            let textHeight=max(40,Self.insightTextHeight(insight ?? L("A análise aparece aqui quando houver um sinal útil no histórico."),width:bounds.width,size:14))
             let statusHeight=max(18,Self.insightTextHeight(message,width:bounds.width,size:10))
             let rect=NSRect(x:20,y:bottom+12,width:bounds.width-40,height:Self.insightHeight(insight,status:message,width:bounds.width)-12)
             NSColor.controlBackgroundColor.setFill();NSBezierPath(roundedRect:rect,xRadius:12,yRadius:12).fill()
-            text("Insight · últimos 7 dias",NSRect(x:34,y:bottom+28,width:bounds.width-300,height:22),14,.labelColor,.semibold)
+            text(L("Insight · últimos 7 dias"),NSRect(x:34,y:bottom+28,width:bounds.width-300,height:22),14,.labelColor,.semibold)
             let paragraph=NSMutableParagraphStyle();paragraph.lineBreakMode = .byWordWrapping
-            ((insight ?? "A análise aparece aqui quando houver um sinal útil no histórico.") as NSString).draw(in:NSRect(x:34,y:bottom+64,width:bounds.width-68,height:textHeight),withAttributes:[.font:NSFont.systemFont(ofSize:14),.foregroundColor:NSColor.labelColor,.paragraphStyle:paragraph])
+            ((insight ?? L("A análise aparece aqui quando houver um sinal útil no histórico.")) as NSString).draw(in:NSRect(x:34,y:bottom+64,width:bounds.width-68,height:textHeight),withAttributes:[.font:NSFont.systemFont(ofSize:14),.foregroundColor:NSColor.labelColor,.paragraphStyle:paragraph])
             (message as NSString).draw(in:NSRect(x:34,y:bottom+64+textHeight+8,width:bounds.width-68,height:statusHeight),withAttributes:[.font:NSFont.systemFont(ofSize:10),.foregroundColor:NSColor.secondaryLabelColor,.paragraphStyle:paragraph])
         }
-        text(pinned ? "Fixado · arraste a faixa superior para mover" : "Clique fora dos cartões para fechar",NSRect(x:20,y:bounds.height-26,width:bounds.width-40,height:18),10,.secondaryLabelColor)
+        text(pinned ? L("Fixado · arraste a faixa superior para mover") : L("Clique fora dos cartões para fechar"),NSRect(x:20,y:bounds.height-26,width:bounds.width-40,height:18),10,.secondaryLabelColor)
     }
 }
 
@@ -225,13 +225,13 @@ final class QuotaDashboard: NSObject {
             let button=NSButton(title:title,target:self,action:action);button.bezelStyle = .rounded
             button.frame=NSRect(x:x,y:headerHeight-33,width:width,height:26);header.addSubview(button);return button
         }
-        let refresh=button("Atualizar",14,90,#selector(refreshNow));refresh.isEnabled=refreshEnabled
-        _=button(pinned ? "Desafixar" : "Fixar",110,90,#selector(togglePinned))
-        let sizes=NSSegmentedControl(labels:["1×","1,25×","1,5×"],trackingMode:.selectOne,target:self,action:#selector(changeScale(_:)))
+        let refresh=button(L("Atualizar"),14,90,#selector(refreshNow));refresh.isEnabled=refreshEnabled
+        _=button(pinned ? L("Desafixar") : L("Fixar"),110,90,#selector(togglePinned))
+        let sizes=NSSegmentedControl(labels:[L("1×"),L("1,25×"),L("1,5×")],trackingMode:.selectOne,target:self,action:#selector(changeScale(_:)))
         sizes.frame=NSRect(x:width<530 ? 14 : 210,y:width<530 ? 8 : 31,width:165,height:26);sizes.selectedSegment=scale==1 ? 0 : scale==1.25 ? 1 : 2;header.addSubview(sizes)
-        _=button("Configurações",width<530 ? 210 : 385,130,#selector(openAccess))
-        _=button("×",width-46,32,#selector(dismissPanel))
-        let message=NSTextField(labelWithString:refreshMessage.isEmpty ? (pinned ? "Fixado · arraste esta faixa para mover" : "Fecha em \(Int(autoCloseSeconds))s · clique fora dos cartões para fechar") : refreshMessage)
+        _=button(L("Configurações"),width<530 ? 210 : 385,130,#selector(openAccess))
+        _=button(L("×"),width-46,32,#selector(dismissPanel))
+        let message=NSTextField(labelWithString:refreshMessage.isEmpty ? (pinned ? L("Fixado · arraste esta faixa para mover") : L("Fecha em \(Int(autoCloseSeconds))s · clique fora dos cartões para fechar")) : refreshMessage)
         message.frame=NSRect(x:width<530 ? 190 : 16,y:8,width:width-(width<530 ? 206 : 32),height:17);message.font = .systemFont(ofSize:10);message.textColor = .secondaryLabelColor;message.lineBreakMode = .byTruncatingTail;header.addSubview(message)
         let scroll=NSScrollView(frame:NSRect(x:0,y:0,width:width,height:height-headerHeight));scroll.drawsBackground=false;scroll.hasVerticalScroller=view.frame.height>height-headerHeight
         scroll.documentView=view;view.dismiss = {[weak self] in if self?.pinned == false {self?.close()}}
@@ -246,7 +246,7 @@ final class QuotaDashboard: NSObject {
     }
     @objc func refreshNow() {
         guard refreshEnabled else{return}
-        refreshMessage="Atualização solicitada; limites de cada provedor continuam valendo"
+        refreshMessage=L("Atualização solicitada; limites de cada provedor continuam valendo")
         onRefresh();update();armTimer()
     }
     @objc func togglePinned() {pinned.toggle();armTimer();update();onOptionsChanged(Double(scale),pinned)}

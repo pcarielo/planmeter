@@ -34,13 +34,13 @@ final class ZaiClient: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate 
                 envelope["retryAfter"] = seconds; envelope["nextAttemptAt"] = now.timeIntervalSince1970 + seconds
             } else if code == 200 {
                 guard data.count <= 65536, let raw = try JSONSerialization.jsonObject(with: data) as? [String:Any],
-                      raw["success"] as? Bool != false else { throw QuotaError.message("Resposta Z.ai inválida") }
+                      raw["success"] as? Bool != false else { throw QuotaError.message(L("Resposta Z.ai inválida")) }
                 if let code = raw["code"] {
                     let valid = number(code).map { $0 == 0 || $0 == 200 } ?? ((code as? String).map { ["0","200"].contains($0) } ?? false)
-                    guard valid else { throw QuotaError.message("Z.ai informou erro") }
+                    guard valid else { throw QuotaError.message(L("Z.ai informou erro")) }
                 }
                 let payload = raw["data"] as? [String:Any] ?? raw
-                guard let rows = payload["limits"] as? [[String:Any]], rows.count <= 32 else { throw QuotaError.message("Quota Z.ai inválida") }
+                guard let rows = payload["limits"] as? [[String:Any]], rows.count <= 32 else { throw QuotaError.message(L("Quota Z.ai inválida")) }
                 envelope["limits"] = rows.map { row -> [String: Any] in
                     var clean: [String:Any] = [:]
                     for field in ["type","percentage","unit","number","nextResetTime"] { if let value = row[field] { clean[field] = value } }
@@ -49,13 +49,13 @@ final class ZaiClient: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate 
                 envelope["status"] = "ok"
             } else { envelope["status"] = "unavailable" }
             let result = try parseZai(JSONSerialization.data(withJSONObject: envelope))
-            if result.status == "ok" && result.snapshot.remaining == nil { throw QuotaError.message("Z.ai não informou percentuais reconhecidos") }
+            if result.status == "ok" && result.snapshot.remaining == nil { throw QuotaError.message(L("Z.ai não informou percentuais reconhecidos")) }
             if result.status=="ok" {
                 var snapshot=result.snapshot;snapshot.credentialScope=quotaCredentialScope(provider:"zai",key:key)
                 return ZaiReading(snapshot:snapshot,status:result.status,retryAfter:result.retryAfter,nextAttemptAt:result.nextAttemptAt)
             }
             return result
-        } catch { throw QuotaError.message("Consulta Z.ai falhou; confira rede, chave e plano. Nenhum detalhe privado foi registrado.") }
+        } catch { throw QuotaError.message(L("Consulta Z.ai falhou; confira rede, chave e plano. Nenhum detalhe privado foi registrado.")) }
     }
     private func request(_ key: String) throws -> (Data, Int, String?) {
         guard !Runtime.isTest else { throw QuotaError.message("Rede bloqueada em testes") }
@@ -74,12 +74,12 @@ final class ZaiClient: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate 
         let session = URLSession(configuration: configuration, delegate:self, delegateQueue:nil)
         defer { session.invalidateAndCancel() }
         lock.lock()
-        if cancelled { lock.unlock(); throw QuotaError.message("Consulta cancelada") }
+        if cancelled { lock.unlock(); throw QuotaError.message(L("Consulta cancelada")) }
         let newTask = session.dataTask(with:request); task = newTask
         lock.unlock(); newTask.resume()
         guard finished.wait(timeout:.now()+17) == .success else { cancel(); throw QuotaError.message("Timeout") }
         lock.lock(); defer { lock.unlock() }
-        guard !cancelled, !failure, let response = response else { throw QuotaError.message("Rede indisponível") }
+        guard !cancelled, !failure, let response = response else { throw QuotaError.message(L("Rede indisponível")) }
         return (body, response.statusCode, response.value(forHTTPHeaderField:"Retry-After"))
     }
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {

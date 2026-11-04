@@ -9,7 +9,7 @@ struct ClaudeCacheProvider {
               raw["source"] as? String == "claude-code-statusline",
               let observed = number(raw["providerObservedAt"]), observed > 0,
               observed <= now.timeIntervalSince1970 + 5,
-              let limits = raw["rateLimits"] as? [String: Any] else { throw QuotaError.message("Cache Claude sem dados verificáveis") }
+              let limits = raw["rateLimits"] as? [String: Any] else { throw QuotaError.message(L("Cache Claude sem dados verificáveis")) }
         var windows: [QuotaWindow] = []
         for (name, duration) in [("five_hour", 300), ("seven_day", 10080)] {
             guard let window = limits[name] as? [String: Any] else { continue }
@@ -25,7 +25,7 @@ struct ClaudeCacheProvider {
         if raw["capturedAt"] != nil {
             guard let received = number(raw["capturedAt"]), received > 0,
                   received >= observed - 5, received <= now.timeIntervalSince1970 + 5 else {
-                throw QuotaError.message("Horário de entrega Claude inválido")
+                throw QuotaError.message(L("Horário de entrega Claude inválido"))
             }
             snapshot.receivedAt = Date(timeIntervalSince1970: received)
         }

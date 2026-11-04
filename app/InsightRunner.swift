@@ -17,15 +17,15 @@ enum InsightFailure:Error {
     case proxyUnavailable,nodeRequired,invalidConfiguration,unavailable,timeout,cancelled,excessiveOutput,failed,invalidResponse
     var message:String {
         switch self {
-        case .proxyUnavailable:return "Não foi possível iniciar a conexão restrita do Prime Agent. Tente novamente."
-        case .nodeRequired:return "O Prime Agent requer Node.js 18 ou posterior. Configure PLANMETER_NODE_PATH com o caminho do executável."
-        case .invalidConfiguration:return "Confira o cliente, o modelo e a conexão escolhidos."
-        case .unavailable:return "Não foi possível iniciar o harness selecionado."
-        case .timeout:return "O insight excedeu o prazo. Tente novamente mais tarde."
-        case .cancelled:return "Geração cancelada."
-        case .excessiveOutput:return "O harness excedeu o limite de resposta."
-        case .failed:return "O harness não concluiu a resposta. Confira a conexão no cliente oficial."
-        case .invalidResponse:return "O harness não retornou um insight curto válido."
+        case .proxyUnavailable:return L("Não foi possível iniciar a conexão restrita do Prime Agent. Tente novamente.")
+        case .nodeRequired:return L("O Prime Agent requer Node.js 18 ou posterior. Configure PLANMETER_NODE_PATH com o caminho do executável.")
+        case .invalidConfiguration:return L("Confira o cliente, o modelo e a conexão escolhidos.")
+        case .unavailable:return L("Não foi possível iniciar o harness selecionado.")
+        case .timeout:return L("O insight excedeu o prazo. Tente novamente mais tarde.")
+        case .cancelled:return L("Geração cancelada.")
+        case .excessiveOutput:return L("O harness excedeu o limite de resposta.")
+        case .failed:return L("O harness não concluiu a resposta. Confira a conexão no cliente oficial.")
+        case .invalidResponse:return L("O harness não retornou um insight curto válido.")
         }
     }
 }
@@ -171,8 +171,8 @@ struct InsightText {
         let signals=Array(InsightAnalysis.signals(projections,now:now).prefix(3))
         guard !signals.isEmpty else{throw InsightFailure.invalidConfiguration}
         let object:[String:Any]=[
-            "task":"Produza um insight analítico, em português cordial, em uma ou duas linhas curtas, com no máximo 220 caracteres cada. Explique o sinal mais importante e sua implicação prática.",
-            "rules":["Use somente os sinais calculados fornecidos. Não faça novos cálculos nem use ferramentas.","Não resuma os cartões: não liste saldos atuais e datas de renovação. Entregue interpretação do ritmo, da mudança de ritmo ou da projeção condicional.","Priorize risco de esgotamento, depois mudança de ritmo. Identifique sempre o provedor e, quando necessário, a janela analisada. Relacione dois sinais apenas se isso ajudar a decisão.","Estimativas dependem da manutenção do ritmo observado. Não transforme projeção em garantia, nem recomende troca para um plano cuja capacidade não foi analisada.","Não invente explicações causais para aumento ou queda. Não recite campos internos. Sem markdown, rótulos técnicos ou rodapé."],
+            "task":L("Produza um insight analítico, em português cordial, em uma ou duas linhas curtas, com no máximo 220 caracteres cada. Explique o sinal mais importante e sua implicação prática."),
+            "rules":[L("Use somente os sinais calculados fornecidos. Não faça novos cálculos nem use ferramentas."),L("Não resuma os cartões: não liste saldos atuais e datas de renovação. Entregue interpretação do ritmo, da mudança de ritmo ou da projeção condicional."),L("Priorize risco de esgotamento, depois mudança de ritmo. Identifique sempre o provedor e, quando necessário, a janela analisada. Relacione dois sinais apenas se isso ajudar a decisão."),L("Estimativas dependem da manutenção do ritmo observado. Não transforme projeção em garantia, nem recomende troca para um plano cuja capacidade não foi analisada."),L("Não invente explicações causais para aumento ou queda. Não recite campos internos. Sem markdown, rótulos técnicos ou rodapé.")],
             "signals":try JSONSerialization.jsonObject(with:JSONEncoder().encode(signals))]
         return try JSONSerialization.data(withJSONObject:object,options:[.sortedKeys])
     }

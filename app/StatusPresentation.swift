@@ -19,7 +19,7 @@ struct StatusPresentation {
         snapshot?.windows.compactMap(\.remaining).filter{$0.isFinite && (0...100).contains($0)}.min()
     }
     static func zaiText(_ snapshot: QuotaSnapshot?) -> String {
-        let periods:[(Int,String)]=[(300,"5h"),(10080,"sem")]
+        let periods:[(Int,String)]=[(300,"5h"),(10080,L("sem"))]
         let values=periods.compactMap { minutes,label -> String? in
             let remaining=snapshot?.windows.filter{$0.durationMinutes==minutes}.compactMap(\.remaining).filter{$0.isFinite && (0...100).contains($0)}.min()
             return remaining.map{label+" "+percentLabel($0)}
@@ -40,7 +40,7 @@ struct StatusPresentation {
         if showKimi && validRemaining(kimi) != nil {providers.append(("kimi","Kimi Code",zaiText(kimi),kimiStale))}
         if let value=validRemaining(grok) {providers.append(("grok","Grok",percentLabel(value),grokStale))}
         if providers.isEmpty {
-            return StatusPresentation(title:NSAttributedString(string:"PlanMeter"+badge,attributes:attributes),accessibilityText:"PlanMeter · configurar acessos"+badge)
+            return StatusPresentation(title:NSAttributedString(string:"PlanMeter"+badge,attributes:attributes),accessibilityText:L("PlanMeter · configurar acessos")+badge)
         }
         for (index, provider) in providers.enumerated() {
             let (key, name, value, stale) = provider
@@ -54,7 +54,7 @@ struct StatusPresentation {
                 title.append(NSAttributedString(string: name, attributes: attributes))
             }
             title.append(NSAttributedString(string: " " + value + (stale ? " ·" : ""), attributes: attributes))
-            let sourceNote=key=="claude" ? (stale ? " (leitura passiva; aguardando Claude Code)" : " (leitura passiva do Claude Code)") : (stale ? " (desatualizado)" : "")
+            let sourceNote=key=="claude" ? (stale ? L(" (leitura passiva; aguardando Claude Code)") : L(" (leitura passiva do Claude Code)")) : (stale ? L(" (desatualizado)") : "")
             labels.append(name + " " + value + sourceNote)
         }
         title.append(NSAttributedString(string: badge, attributes: attributes))

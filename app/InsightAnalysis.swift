@@ -11,7 +11,7 @@ struct InsightSignal:Codable,Equatable {
 }
 
 enum InsightAnalysis {
-    static let waitingMessage="O histórico está sendo acompanhado. Ainda não há um sinal de ritmo ou risco que justifique uma análise."
+    static let waitingMessage=L("O histórico está sendo acompanhado. Ainda não há um sinal de ritmo ou risco que justifique uma análise.")
     static func decimal(_ value:Double)->String {String(format:"%.1f",value).replacingOccurrences(of:".",with:",")}
     static func signals(_ projections:[UsageProjection],now:Date=Date())->[InsightSignal] {
         var result:[InsightSignal]=[]
@@ -24,11 +24,11 @@ enum InsightAnalysis {
                 let rate:Double?
                 let basis:String
                 if hours<=6 {
-                    rate=p.recentPercentPerHour;basis="ritmo recente observado"
+                    rate=p.recentPercentPerHour;basis=L("ritmo recente observado")
                 } else if let calendarRate=p.calendarPercentPerHour,p.calendarHours>=24,calendarRate.isFinite,calendarRate>=0 {
-                    rate=calendarRate;basis="média por hora de relógio em dias completos do período, incluindo as pausas"
+                    rate=calendarRate;basis=L("média por hora de relógio em dias completos do período, incluindo as pausas")
                 } else if let historical=p.historicalCalendarPercentPerHour,p.historicalCalendarHours>=24,historical.isFinite,historical>=0 {
-                    rate=historical;basis="média por hora de relógio de períodos anteriores registrados, incluindo as pausas"
+                    rate=historical;basis=L("média por hora de relógio de períodos anteriores registrados, incluindo as pausas")
                 } else {rate=nil;basis=""}
                 if let rate=rate,rate.isFinite,hours>0,rate>0 {
                     let estimatedNow=max(0,p.remaining-rate*age)
@@ -36,17 +36,17 @@ enum InsightAnalysis {
                     let projected=p.remaining-rate*(hours+age)
                     if projected < -0.5 {
                         let reduction=min(100,max(1,ceil((1-sustainable/rate)*100-0.000001)))
-                        result.append(InsightSignal(kind:"depletion_risk",provider:p.provider,window:p.window,facts:["\(name), janela \(p.window): \(basis) de \(decimal(rate)) pontos percentuais por hora.","Mantido esse ritmo, o saldo duraria cerca de \(intervalLabel(max(0,p.remaining/rate-age)*3600)), enquanto faltam \(intervalLabel(ceil(hours*60)*60)) para renovar.","Para chegar à renovação, o ritmo precisaria cair aproximadamente \(Int(reduction))% em relação ao observado. A projeção depende da manutenção do padrão de uso."],priority:0,urgency:max(0,p.remaining/rate-age)))
+                        result.append(InsightSignal(kind:"depletion_risk",provider:p.provider,window:p.window,facts:[L("\(name), janela \(p.window): \(basis) de \(decimal(rate)) pontos percentuais por hora."),L("Mantido esse ritmo, o saldo duraria cerca de \(intervalLabel(max(0,p.remaining/rate-age)*3600)), enquanto faltam \(intervalLabel(ceil(hours*60)*60)) para renovar."),L("Para chegar à renovação, o ritmo precisaria cair aproximadamente \(Int(reduction))% em relação ao observado. A projeção depende da manutenção do padrão de uso.")],priority:0,urgency:max(0,p.remaining/rate-age)))
                     } else {
                         let tight=projected<10
-                        result.append(InsightSignal(kind:tight ? "tight_margin" : "projected_margin",provider:p.provider,window:p.window,facts:["\(name), janela \(p.window): o ritmo observado projeta cerca de \(Int(max(0,projected).rounded()))% de saldo na próxima renovação.","Essa margem é uma projeção condicional à \(basis) de \(decimal(rate)) pontos percentuais por hora, não garantia de disponibilidade."],priority:tight ? 1 : 3,urgency:projected))
+                        result.append(InsightSignal(kind:tight ? "tight_margin" : "projected_margin",provider:p.provider,window:p.window,facts:[L("\(name), janela \(p.window): o ritmo observado projeta cerca de \(Int(max(0,projected).rounded()))% de saldo na próxima renovação."),L("Essa margem é uma projeção condicional à \(basis) de \(decimal(rate)) pontos percentuais por hora, não garantia de disponibilidade.")],priority:tight ? 1 : 3,urgency:projected))
                     }
                 }
             }
             if let recent=p.recentPercentPerHour,let prior=p.baselinePercentPerHour,prior>0,recent.isFinite,prior.isFinite {
                 let change=(recent/prior-1)*100
                 if change.isFinite,abs(change)>=25,abs(change)<=1_000_000,abs(recent-prior)>=0.1 {
-                    result.append(InsightSignal(kind:change>0 ? "accelerating" : "decelerating",provider:p.provider,window:p.window,facts:["\(name), janela \(p.window): o ritmo na janela recente de seis horas \(change>0 ? "aumentou" : "diminuiu") cerca de \(Int(abs(change).rounded()))% em relação à mesma faixa horária observada em pelo menos dois dias anteriores.","Ritmo recente: \(decimal(recent)); anterior: \(decimal(prior)) pontos percentuais por hora. São intervalos separados, com pelo menos uma hora observada em cada um."],priority:2,urgency:-abs(change)))
+                    result.append(InsightSignal(kind:change>0 ? "accelerating" : "decelerating",provider:p.provider,window:p.window,facts:[L("\(name), janela \(p.window): o ritmo na janela recente de seis horas \(change>0 ? L("aumentou") : L("diminuiu")) cerca de \(Int(abs(change).rounded()))% em relação à mesma faixa horária observada em pelo menos dois dias anteriores."),L("Ritmo recente: \(decimal(recent)); anterior: \(decimal(prior)) pontos percentuais por hora. São intervalos separados, com pelo menos uma hora observada em cada um.")],priority:2,urgency:-abs(change)))
                 }
             }
         }

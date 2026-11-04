@@ -7,14 +7,14 @@ struct ClaudeQuotaReading:Codable {
 }
 func claudeQuotaStatus(_ status:String)->String {
     switch status {
-    case "ok":return "Quota atualizada pelo Claude Code"
-    case "setup_required":return "Confirme a pasta de consulta no Claude Code para habilitar Atualizar."
+    case "ok":return L("Quota atualizada pelo Claude Code")
+    case "setup_required":return L("Confirme a pasta de consulta no Claude Code para habilitar Atualizar.")
     case "client_unavailable":return "Instale o Claude Code ou configure PLANMETER_CLAUDE_PATH."
-    case "auth_unavailable":return "Autorize a consulta de quota em Contas → Claude Code."
+    case "auth_unavailable":return L("Autorize a consulta de quota em Contas → Claude Code.")
     case "unauthorized":return "O login Claude precisa ser renovado no cliente oficial."
-    case "stale":return "O Claude exibiu dados anteriores; aguardando uma leitura atualizada."
-    case "rate_limited":return "O Claude limitou as consultas. Aguarde o prazo informado."
-    default:return "Não foi possível consultar o Claude; última leitura preservada."
+    case "stale":return L("O Claude exibiu dados anteriores; aguardando uma leitura atualizada.")
+    case "rate_limited":return L("O Claude limitou as consultas. Aguarde o prazo informado.")
+    default:return L("Não foi possível consultar o Claude; última leitura preservada.")
     }
 }
 func runClaudeQuotaMonitorTests() {

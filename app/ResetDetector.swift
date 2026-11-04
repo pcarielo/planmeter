@@ -125,14 +125,14 @@ func intervalLabel(_ seconds: TimeInterval) -> String {
     return "\(minutes)min"
 }
 func countdownLabel(reset: Double?, now: Date = Date()) -> String {
-    guard let reset = reset, reset.isFinite else { return "Prazo não informado" }
+    guard let reset = reset, reset.isFinite else { return L("Prazo não informado") }
     let difference = reset - now.timeIntervalSince1970
-    guard difference > 0 else { return "Horário previsto passou; aguardando leitura" }
+    guard difference > 0 else { return L("Horário previsto passou; aguardando leitura") }
     let minutes = Int(min(52_560_000, ceil(difference / 60)))
     let days = minutes / 1440, hours = minutes % 1440 / 60, mins = minutes % 60
-    if days > 0 { return "Previsto em \(days)d \(hours)h \(mins)min" }
-    if hours > 0 { return "Previsto em \(hours)h \(mins)min" }
-    return "Previsto em \(mins)min"
+    if days > 0 { return L("Previsto em \(days)d \(hours)h \(mins)min") }
+    if hours > 0 { return L("Previsto em \(hours)h \(mins)min") }
+    return L("Previsto em \(mins)min")
 }
 struct CelebrationPreferences: Codable {
     var loopEnabled = true

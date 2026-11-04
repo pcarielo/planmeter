@@ -13,7 +13,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         var pro=licenseStore.isPro
         var message=licenseStore.message
         #if PLANMETER_DEVELOPMENT
-        if let simulation=simulatedPro {pro=simulation;message=simulation ? "Simulação Pro: todos os planos e insights. Sem compra." : "Simulação Free: até dois planos. Sem compra."}
+        if let simulation=simulatedPro {pro=simulation;message=simulation ? L("Simulação Pro: todos os planos e insights. Sem compra.") : L("Simulação Free: até dois planos. Sem compra.")}
         #endif
         planAccess.isPro=pro;settingsWindow.model.licenseMessage=message
         settingsWindow.model.licensePrice=licenseStore.price;settingsWindow.model.licenseBusy=licenseStore.busy
@@ -102,7 +102,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var menu = NSMenu()
     var snapshot: QuotaSnapshot?
     var zaiReading: ZaiReading?, zaiSnapshot: QuotaSnapshot?
-    var zaiError: String? = "Configure a chave Z.ai no menu para consultar quotas"
+    var zaiError: String? = L("Configure a chave Z.ai no menu para consultar quotas")
     var zaiBusy = false, zaiReads = 0
     var zaiGeneration=0
     var zaiCooldown = Date.distantPast
@@ -150,9 +150,9 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let otherMonitors=["io.github.pcarielo.planmeter","local.codex.balance"].flatMap {NSRunningApplication.runningApplications(withBundleIdentifier:$0)}.filter {$0.processIdentifier != ProcessInfo.processInfo.processIdentifier}
         if let other=otherMonitors.first {
             NSApp.setActivationPolicy(.accessory)
-            let alert=NSAlert();alert.messageText="Já existe um monitor aberto"
-            alert.informativeText="A instalação em uso é " + (other.bundleURL?.path ?? other.localizedName ?? "outro PlanMeter") + ". Esta cópia será encerrada para evitar indicadores duplicados."
-            alert.addButton(withTitle:"Usar o monitor aberto");alert.runModal()
+            let alert=NSAlert();alert.messageText=L("Já existe um monitor aberto")
+            alert.informativeText=L("A instalação em uso é ") + (other.bundleURL?.path ?? other.localizedName ?? L("outro PlanMeter")) + L(". Esta cópia será encerrada para evitar indicadores duplicados.")
+            alert.addButton(withTitle:L("Usar o monitor aberto"));alert.runModal()
             other.activate(options:.activateIgnoringOtherApps);NSApp.terminate(nil);return
         }
         NSApp.setActivationPolicy(.accessory)
@@ -168,8 +168,8 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let data = try? Data(contentsOf: claudeResetFile), let state = try? JSONDecoder().decode(ResetState.self, from: data) { claudeDetector.state = state }
         loadRenewalHistory()
         if let data = try? Data(contentsOf: preferencesFile), let pref = try? JSONDecoder().decode(CelebrationPreferences.self, from: data) { preferences = pref }
-        if let data = try? Data(contentsOf: zaiFile), let cached = try? JSONDecoder().decode(ZaiReading.self, from: data) { zaiReading = cached; zaiSnapshot = cached.snapshot; zaiError = "Cache Z.ai; aguardando leitura" }
-        errorText = snapshot == nil ? nil : "Dados em cache; aguardando leitura"
+        if let data = try? Data(contentsOf: zaiFile), let cached = try? JSONDecoder().decode(ZaiReading.self, from: data) { zaiReading = cached; zaiSnapshot = cached.snapshot; zaiError = L("Cache Z.ai; aguardando leitura") }
+        errorText = snapshot == nil ? nil : L("Dados em cache; aguardando leitura")
         if let data=try? Data(contentsOf:cacheDirectory.appendingPathComponent("interface-preferences.json")),let value=try? JSONDecoder().decode(InterfacePreferences.self,from:data) {interfacePreferences=value.normalized()}
         if let data=try? Data(contentsOf:cacheDirectory.appendingPathComponent("operations.json")),let value=try? JSONDecoder().decode(OperationsSettings.self,from:data) {operations=value}
         policy.baseInterval=operations.interval(for:"codex")
@@ -239,11 +239,11 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func configureMainMenu() {
         let appMenu=NSMenu();let root=NSMenuItem();let actions=NSMenu()
-        let settings=NSMenuItem(title:"Configurações…",action:#selector(configureSettings),keyEquivalent:",");settings.target=self;actions.addItem(settings)
-        let quit=NSMenuItem(title:"Sair do PlanMeter",action:#selector(quitApp),keyEquivalent:"q");quit.target=self;actions.addItem(quit)
+        let settings=NSMenuItem(title:L("Configurações…"),action:#selector(configureSettings),keyEquivalent:",");settings.target=self;actions.addItem(settings)
+        let quit=NSMenuItem(title:L("Sair do PlanMeter"),action:#selector(quitApp),keyEquivalent:"q");quit.target=self;actions.addItem(quit)
         root.submenu=actions;appMenu.addItem(root)
-        let fileMenu=NSMenuItem(title:"Arquivo",action:nil,keyEquivalent:"");let fileActions=NSMenu(title:"Arquivo")
-        let close=NSMenuItem(title:"Fechar janela",action:#selector(NSWindow.performClose(_:)),keyEquivalent:"w")
+        let fileMenu=NSMenuItem(title:L("Arquivo"),action:nil,keyEquivalent:"");let fileActions=NSMenu(title:L("Arquivo"))
+        let close=NSMenuItem(title:L("Fechar janela"),action:#selector(NSWindow.performClose(_:)),keyEquivalent:"w")
         close.target=nil;fileActions.addItem(close);fileMenu.submenu=fileActions;appMenu.addItem(fileMenu)
         NSApp.mainMenu=appMenu
     }
@@ -265,7 +265,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             zaiStale: stale(zaiSnapshot, error: zaiError), badge: badge, kimi:visible(kimi.snapshot,"kimi"), kimiStale:kimi.stale, showKimi:allowed("kimi"),grok:visible(grok.snapshot,"grok"),grokStale:grok.stale)
         status.button?.attributedTitle = presentation.title
         status.button?.setAccessibilityLabel(presentation.accessibilityText)
-        status.button?.toolTip = presentation.accessibilityText + "\nClique abre métricas. Clique direito/Control-clique abre configurações."
+        status.button?.toolTip = presentation.accessibilityText + L("\nClique abre métricas. Clique direito/Control-clique abre configurações.")
         updateDashboard();buildMenu(); reconcileCelebration()
         if settingsWindow.window?.isVisible == true {let previous=accessSetup.providers;prepareAccessSettings();if previous != accessSetup.providers {settingsWindow.model.accessRevision += 1}}
     }
@@ -291,14 +291,14 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return values.filter{allowed($0.0) && !$0.2}.compactMap{$0.1}.flatMap{usageTimeline.projections(for:$0,maximumGap:max(3600,operations.interval(for:$0.effectiveProvider)*1.5),connectionID:$0.credentialScope,renewals:renewalHistory.entries)}
     }
     func generateInsight() {
-        guard !timelineWriteBlocked else{settingsWindow.model.insightMessage="O histórico de uso precisa ser recuperado antes de gerar insights.";return}
+        guard !timelineWriteBlocked else{settingsWindow.model.insightMessage=L("O histórico de uso precisa ser recuperado antes de gerar insights.");return}
         insights.generate(currentInsightProjections(),permitted:planAccess.insightsAllowed && InsightHarness.modelProviders.contains(insights.preferences.provider))
     }
     func cardRefreshStatuses()->[String:CardRefreshStatus] {
         let paused=activity.suspended
         let states:[String:CardRefreshStatus]=[
             "codex":CardRefreshStatus(busy:policy.busy,paused:paused),
-            "claude":CardRefreshStatus(busy:claudeQuota.busy,nextAllowedAt:claudeQuota.enabled ? claudeQuota.nextManualRefreshAt : .distantPast,paused:paused,actionTitle:claudeQuota.enabled ? "Atualizar agora" : "Reler dados locais"),
+            "claude":CardRefreshStatus(busy:claudeQuota.busy,nextAllowedAt:claudeQuota.enabled ? claudeQuota.nextManualRefreshAt : .distantPast,paused:paused,actionTitle:claudeQuota.enabled ? L("Atualizar agora") : L("Reler dados locais")),
             "zai":CardRefreshStatus(busy:zaiBusy,nextAllowedAt:zaiManualCooldown,paused:paused),
             "kimi":CardRefreshStatus(busy:kimi.busy,nextAllowedAt:kimi.schedule.manual,paused:paused),
             "grok":CardRefreshStatus(busy:grok.busy,nextAllowedAt:grok.schedule.manual,paused:paused)]
@@ -314,7 +314,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dashboard.cardRefreshStates=cardRefreshStatuses()
         dashboard.onCardRefresh={[weak self] key in self?.refreshCard(key)}
         dashboard.insight=planAccess.isPro ? insights.text : nil
-        dashboard.insightStatus=planAccess.isPro ? (timelineWriteBlocked ? "Histórico de uso indisponível; arquivo original preservado para recuperação." : insights.status(current:currentInsightProjections())) : nil
+        dashboard.insightStatus=planAccess.isPro ? (timelineWriteBlocked ? L("Histórico de uso indisponível; arquivo original preservado para recuperação.") : insights.status(current:currentInsightProjections())) : nil
         dashboard.insightBusy=insights.busy
         dashboard.insightEnabled=planAccess.isPro && InsightHarness.modelProviders.contains(insights.preferences.provider) && !timelineWriteBlocked
         dashboard.onInsight = {[weak self] in self?.generateInsight()}
@@ -338,7 +338,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dashboard.update()
     }
     func providerRefreshStates()->[ProviderRefreshState] {
-        let claudeMessage=claudeQuota.enabled ? claudeQuota.message : claudeError ?? (claudeSnapshot == nil ? "Claude: aguardando dados do cliente" : "Claude: leitura local concluída")
+        let claudeMessage=claudeQuota.enabled ? claudeQuota.message : claudeError ?? (claudeSnapshot == nil ? L("Claude: aguardando dados do cliente") : L("Claude: leitura local concluída"))
         return [
             ProviderRefreshState(provider:"codex",message:nil,busy:policy.busy),
             ProviderRefreshState(provider:"claude",message:claudeMessage,busy:claudeQuota.busy),
@@ -348,13 +348,13 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ]
     }
     func prepareAccessSettings() {
-        func status(_ snapshot:QuotaSnapshot?)->String {StatusPresentation.validRemaining(snapshot)==nil ? "Sem métrica disponível" : "Métrica disponível em cache"}
+        func status(_ snapshot:QuotaSnapshot?)->String {StatusPresentation.validRemaining(snapshot)==nil ? L("Sem métrica disponível") : L("Métrica disponível em cache")}
         accessSetup.providers=[
-            ProviderAccess(key:"codex",name:"Codex",status:status(snapshot),detail:"Login ChatGPT pelo Codex CLI oficial.",actionTitle:"Como conectar"),
-            ProviderAccess(key:"claude",name:"Claude Code",status:status(claudeSnapshot),detail:claudeQuota.enabled ? "Consulta pela tela /usage do Claude Code oficial." : "Autorize a consulta ativa ou configure a leitura passiva.",actionTitle:"Configurar",actions:["authorize","passive"]),
-            ProviderAccess(key:"zai",name:"Z.ai",status:status(zaiSnapshot),detail:"Chave no Keychain deste Mac.",actionTitle:KeychainStore.needsAuthorization ? "Autorizar acesso" : "Cadastrar chave",enabled:!zaiBusy,actions:["authorize","remove"]),
-            ProviderAccess(key:"kimi",name:"Kimi Code",status:kimi.errorText ?? status(kimi.snapshot),detail:"Chave do Coding Plan no Keychain. OAuth preservado.",actionTitle:KimiKeychain.needsAuthorization ? "Autorizar acesso" : "Cadastrar chave",enabled:!kimi.busy,actions:["authorize","remove"]),
-            ProviderAccess(key:"grok",name:"Grok",status:status(grok.snapshot),detail:grokMeasurementDescription(grok.snapshot),actionTitle:"Como conectar")
+            ProviderAccess(key:"codex",name:"Codex",status:status(snapshot),detail:L("Login ChatGPT pelo Codex CLI oficial."),actionTitle:L("Como conectar")),
+            ProviderAccess(key:"claude",name:"Claude Code",status:status(claudeSnapshot),detail:claudeQuota.enabled ? L("Consulta pela tela /usage do Claude Code oficial.") : L("Autorize a consulta ativa ou configure a leitura passiva."),actionTitle:L("Configurar"),actions:["authorize","passive"]),
+            ProviderAccess(key:"zai",name:"Z.ai",status:status(zaiSnapshot),detail:L("Chave no Keychain deste Mac."),actionTitle:KeychainStore.needsAuthorization ? L("Autorizar acesso") : L("Cadastrar chave"),enabled:!zaiBusy,actions:["authorize","remove"]),
+            ProviderAccess(key:"kimi",name:"Kimi Code",status:kimi.errorText ?? status(kimi.snapshot),detail:L("Chave do Coding Plan no Keychain. OAuth preservado."),actionTitle:KimiKeychain.needsAuthorization ? L("Autorizar acesso") : L("Cadastrar chave"),enabled:!kimi.busy,actions:["authorize","remove"]),
+            ProviderAccess(key:"grok",name:"Grok",status:status(grok.snapshot),detail:grokMeasurementDescription(grok.snapshot),actionTitle:L("Como conectar"))
         ]
         let connected:[String:Bool] = [
             "codex":StatusPresentation.validRemaining(snapshot) != nil && errorText == nil,
@@ -364,7 +364,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             "kimi":StatusPresentation.validRemaining(kimi.snapshot) != nil && kimi.errorText == nil,
             "grok":StatusPresentation.validRemaining(grok.snapshot) != nil && grok.errorText == nil
         ]
-        accessSetup.summary=planAccess.isPro ? "Pro: todos os planos disponíveis." : planAccess.needsSelection ? "Free: escolha até 2 planos. Desmarque os demais para continuar." : "Free: \(planAccess.active.count)/2 planos. Pro libera todos e insights."
+        accessSetup.summary=planAccess.isPro ? L("Pro: todos os planos disponíveis.") : planAccess.needsSelection ? L("Free: escolha até 2 planos. Desmarque os demais para continuar.") : L("Free: \(planAccess.active.count)/2 planos. Pro libera todos e insights.")
         accessSetup.onSelect = {[weak self] key,enabled in self?.selectPlan(key,enabled)}
         accessSetup.onUpgrade = {[weak self] in self?.showSettings(page:"general")}
         for index in accessSetup.providers.indices {
@@ -432,7 +432,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if let data=try? JSONEncoder().encode(value),self.writePrivate(data,to:self.cacheDirectory.appendingPathComponent("operations.json")) {
                 self.audit(.configuration,.app,.settingsChanged,.success)
                 self.applyOperations(value)
-            } else {self.settingsWindow.model.logError="Não foi possível salvar as preferências."}
+            } else {self.settingsWindow.model.logError=L("Não foi possível salvar as preferências.")}
         }
         model.onLoginAudit = {[weak self] result in self?.audit(.configuration,.app,.settingsChanged,result)}
         model.onLogDirectory = {[weak self] in
@@ -443,7 +443,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self=self,!Runtime.isTest else{return}
             let file=self.auditLog.url(category)
             if FileManager.default.fileExists(atPath:file.path) {NSWorkspace.shared.open(file)}
-            else {self.settingsWindow.model.logError="Ainda não há registros para esta categoria."}
+            else {self.settingsWindow.model.logError=L("Ainda não há registros para esta categoria.")}
         }
         model.onChange = { [weak self] interface,confetti,respect in
             guard let self=self else{return};self.interfacePreferences=interface
@@ -483,46 +483,46 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func info(_ text: String) -> NSMenuItem { let i = NSMenuItem(title: text, action: nil, keyEquivalent: ""); i.isEnabled = false; return i }
     func addProvider(_ title: String, value: QuotaSnapshot?, error: String?, showObservation: Bool = true) {
-        menu.addItem(info(title + " — restante"))
+        menu.addItem(info(title + L(" — restante")))
         if let value = value {
-            if showObservation { menu.addItem(info("Dados observados: \(localDate(value.queriedAt))")) }
-            if showObservation && stale(value, error: error) { menu.addItem(info("Desatualizado · não é leitura nova do provedor")) }
-            if value.windows.isEmpty { menu.addItem(info("Janelas não informadas")) }
+            if showObservation { menu.addItem(info(L("Dados observados: \(localDate(value.queriedAt))"))) }
+            if showObservation && stale(value, error: error) { menu.addItem(info(L("Desatualizado · não é leitura nova do provedor"))) }
+            if value.windows.isEmpty { menu.addItem(info(L("Janelas não informadas"))) }
             for w in value.windows {
-                menu.addItem(info("\(w.name) · \(durationLabel(w.durationMinutes)): \(percentLabel(w.remaining))"))
-                menu.addItem(info(w.reset.map { "Reset previsto: \(localDate(Date(timeIntervalSince1970: $0)))" } ?? "Reset não informado"))
+                menu.addItem(info(L("\(w.name) · \(durationLabel(w.durationMinutes)): \(percentLabel(w.remaining))")))
+                menu.addItem(info(w.reset.map { L("Reset previsto: \(localDate(Date(timeIntervalSince1970: $0)))") } ?? L("Reset não informado")))
                 let countdown = info(countdownLabel(reset: w.reset)); countdown.representedObject = value.effectiveProvider + ":" + w.name; menu.addItem(countdown)
             }
-        } else { menu.addItem(info("— · sem dados de quota")) }
+        } else { menu.addItem(info(L("— · sem dados de quota"))) }
         if let error = error { menu.addItem(info(error)) }
     }
     func buildMenu() {
         menu.removeAllItems()
-        let access=NSMenuItem(title:"Configurações…",action:#selector(configureSettings),keyEquivalent:"")
+        let access=NSMenuItem(title:L("Configurações…"),action:#selector(configureSettings),keyEquivalent:"")
         access.target=self;menu.addItem(access);menu.addItem(NSMenuItem.separator())
-        let zaiUpdate = NSMenuItem(title: "Z.ai: consultar agora", action: #selector(refreshZaiNow), keyEquivalent: "")
+        let zaiUpdate = NSMenuItem(title: L("Z.ai: consultar agora"), action: #selector(refreshZaiNow), keyEquivalent: "")
         zaiUpdate.target = self; zaiUpdate.isEnabled = allowed("zai") && !activity.suspended && !zaiRequestIsManual
-        if !allowed("zai") {zaiUpdate.title="Z.ai: plano não selecionado"}
+        if !allowed("zai") {zaiUpdate.title=L("Z.ai: plano não selecionado")}
         menu.addItem(zaiUpdate)
         menu.addItem(NSMenuItem.separator())
-        let kimiUpdate = NSMenuItem(title:"Kimi: consultar agora",action:#selector(KimiMonitor.refreshNow),keyEquivalent:"")
-        kimiUpdate.target=kimi;kimiUpdate.isEnabled = allowed("kimi") && !activity.suspended && !kimi.busy;if !allowed("kimi") {kimiUpdate.title="Kimi: plano não selecionado"};menu.addItem(kimiUpdate)
-        let grokUpdate=NSMenuItem(title:"Grok: consultar agora",action:#selector(GrokMonitor.refreshNow),keyEquivalent:"")
-        grokUpdate.target=grok;grokUpdate.isEnabled = allowed("grok") && !activity.suspended && !grok.busy;if !allowed("grok") {grokUpdate.title="Grok: plano não selecionado"};menu.addItem(grokUpdate)
-        let usage = NSMenuItem(title: "Claude: abrir Settings → Usage", action: #selector(openClaudeUsage), keyEquivalent: "")
+        let kimiUpdate = NSMenuItem(title:L("Kimi: consultar agora"),action:#selector(KimiMonitor.refreshNow),keyEquivalent:"")
+        kimiUpdate.target=kimi;kimiUpdate.isEnabled = allowed("kimi") && !activity.suspended && !kimi.busy;if !allowed("kimi") {kimiUpdate.title=L("Kimi: plano não selecionado")};menu.addItem(kimiUpdate)
+        let grokUpdate=NSMenuItem(title:L("Grok: consultar agora"),action:#selector(GrokMonitor.refreshNow),keyEquivalent:"")
+        grokUpdate.target=grok;grokUpdate.isEnabled = allowed("grok") && !activity.suspended && !grok.busy;if !allowed("grok") {grokUpdate.title=L("Grok: plano não selecionado")};menu.addItem(grokUpdate)
+        let usage = NSMenuItem(title: L("Claude: abrir Settings → Usage"), action: #selector(openClaudeUsage), keyEquivalent: "")
         usage.target = self; menu.addItem(usage)
         menu.addItem(NSMenuItem.separator())
-        let history = NSMenuItem(title: "Histórico de renovações", action: nil, keyEquivalent: "")
+        let history = NSMenuItem(title: L("Histórico de renovações"), action: nil, keyEquivalent: "")
         history.submenu = historyMenu(); menu.addItem(history)
-        let ack = NSMenuItem(title: "Dispensar aviso/confete", action: #selector(acknowledge), keyEquivalent: "")
+        let ack = NSMenuItem(title: L("Dispensar aviso/confete"), action: #selector(acknowledge), keyEquivalent: "")
         ack.target = self; ack.isEnabled = demoPending || !realPending.isEmpty; menu.addItem(ack)
-        let demo = NSMenuItem(title: "DEMO de confete em loop (sem consulta)", action: #selector(demoConfetti), keyEquivalent: "")
+        let demo = NSMenuItem(title: L("DEMO de confete em loop (sem consulta)"), action: #selector(demoConfetti), keyEquivalent: "")
         demo.target = self; menu.addItem(demo)
-        let animated = NSMenuItem(title: "DEMO animada (exceção somente neste teste)", action: #selector(demoMotionConfetti), keyEquivalent: "")
+        let animated = NSMenuItem(title: L("DEMO animada (exceção somente neste teste)"), action: #selector(demoMotionConfetti), keyEquivalent: "")
         animated.target = self; menu.addItem(animated)
-        let refresh = NSMenuItem(title: "Atualizar agora", action: #selector(manualRefresh), keyEquivalent: "r")
+        let refresh = NSMenuItem(title: L("Atualizar agora"), action: #selector(manualRefresh), keyEquivalent: "r")
         refresh.target = self; refresh.isEnabled = !policy.busy && !policy.sleeping; menu.addItem(refresh)
-        let quit = NSMenuItem(title: "Sair", action: #selector(quitApp), keyEquivalent: "q"); quit.target = self; menu.addItem(quit)
+        let quit = NSMenuItem(title: L("Sair"), action: #selector(quitApp), keyEquivalent: "q"); quit.target = self; menu.addItem(quit)
     }
     func loadRenewalHistory() {
         let file=cacheDirectory.appendingPathComponent("renewal-history.json")
@@ -530,8 +530,8 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         do {renewalHistory=try JSONDecoder().decode(RenewalHistory.self,from:Data(contentsOf:file))}
         catch {
             let backup=cacheDirectory.appendingPathComponent("renewal-history.corrupt-"+UUID().uuidString+".json")
-            do {try FileManager.default.moveItem(at:file,to:backup);renewalRecoveryMessage="Não foi possível ler o histórico anterior; uma cópia foi preservada para recuperação."}
-            catch {renewalHistoryWriteBlocked=true;renewalRecoveryMessage="Não foi possível ler o histórico; o arquivo original foi preservado e a gravação suspensa."}
+            do {try FileManager.default.moveItem(at:file,to:backup);renewalRecoveryMessage=L("Não foi possível ler o histórico anterior; uma cópia foi preservada para recuperação.")}
+            catch {renewalHistoryWriteBlocked=true;renewalRecoveryMessage=L("Não foi possível ler o histórico; o arquivo original foi preservado e a gravação suspensa.")}
         }
     }
     func refreshRenewalHistory() {
@@ -540,7 +540,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for value in [snapshot,claudeSnapshot,zaiSnapshot,kimi.historySnapshot,grok.snapshot].compactMap({$0}) {changed=renewalHistory.ingest(value) || changed}
         renewalHistoryDirty=renewalHistoryDirty || changed
         if renewalHistoryDirty,!renewalHistoryWriteBlocked,let data=try? JSONEncoder().encode(renewalHistory),writePrivate(data,to:cacheDirectory.appendingPathComponent("renewal-history.json")) {renewalHistoryDirty=false}
-        renewalWindow.persistenceMessage=renewalRecoveryMessage ?? (renewalHistoryDirty ? "Não foi possível salvar o histórico; nova tentativa na próxima leitura." : nil)
+        renewalWindow.persistenceMessage=renewalRecoveryMessage ?? (renewalHistoryDirty ? L("Não foi possível salvar o histórico; nova tentativa na próxima leitura.") : nil)
         renewalWindow.update(renewalHistory)
     }
     func historyMenu() -> NSMenu {
@@ -557,16 +557,16 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard shownKey != key else { return }
         shownKey = key
         let providers = Set(pending.map { ($0.provider ?? "codex") == "claude" ? "Claude" : "Codex" }).sorted().joined(separator: " + ")
-        let resetDescription = pending.count == 1 ? "1 reset detectado" : "\(pending.count) resets detectados"
+        let resetDescription = pending.count == 1 ? L("1 reset detectado") : L("\(pending.count) resets detectados")
         confetti.onAcknowledge = { [weak self] in self?.acknowledge() }
-        confetti.showLoop(message: demoPending ? "DEMO separada. Sem quota/histórico real. Clique neste aviso para dispensar." : "\(providers): \(resetDescription). Clique neste aviso para reconhecer.", demo: demoPending, motion: motion, display: celebrationDisplay, renderOffscreen: celebrationRenderOffscreen)
+        confetti.showLoop(message: demoPending ? L("DEMO separada. Sem quota/histórico real. Clique neste aviso para dispensar.") : L("\(providers): \(resetDescription). Clique neste aviso para reconhecer."), demo: demoPending, motion: motion, display: celebrationDisplay, renderOffscreen: celebrationRenderOffscreen)
     }
     @objc func acknowledge() {
         if demoPending { demoPending = false; demoMotion = false }
         else {
             let pending = Set(realPending.map(\.id)); let old = detector.state, oldClaude = claudeDetector.state
             detector.state.acknowledge(ids: pending); claudeDetector.state.acknowledge(ids: pending)
-            if !saveStates() { detector.state = old; claudeDetector.state = oldClaude; errorText = "Reconhecimento não foi salvo; tente novamente" }
+            if !saveStates() { detector.state = old; claudeDetector.state = oldClaude; errorText = L("Reconhecimento não foi salvo; tente novamente") }
         }
         confetti.close(); shownKey = nil; updateUI(); writeMetrics()
     }
@@ -615,7 +615,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // JSON epoch conversion can shift an unchanged timestamp by a fraction of a millisecond.
             if current.queriedAt.timeIntervalSince(claudeDetector.state.baseline?.queriedAt ?? .distantPast) > 0.001 { _ = claudeDetector.accept(current); _ = saveStates() }
             claudeSnapshot = current; claudeError = nil;audit(.queries,.claude,.readCache,.success)
-        } catch { claudeError = "Aguardando dados do uso normal Claude; cache indisponível"; claudeDetector.interrupt();audit(.queries,.claude,.readCache,.failure) }
+        } catch { claudeError = L("Aguardando dados do uso normal Claude; cache indisponível"); claudeDetector.interrupt();audit(.queries,.claude,.readCache,.failure) }
     }
     func refreshClaude(manual:Bool=false) {
         guard allowed("claude"),!activity.suspended else { return }
@@ -623,9 +623,9 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func authorizeClaudeQuota() {
         guard !Runtime.isTest,allowed("claude"),!claudeQuota.busy else{return}
-        let alert=NSAlert();alert.messageText="Consultar a quota pelo Claude Code?"
-        alert.informativeText="O PlanMeter abrirá o cliente oficial para ler /usage. Ao continuar, você autoriza confirmar confiança somente na pasta vazia e exclusiva ~/Library/Application Support/PlanMeter/ClaudeProbe. Isso altera uma preferência de segurança do Claude Code. O login permanece sob controle do cliente, e a consulta não envia um pedido ao modelo."
-        alert.addButton(withTitle:"Ativar e autorizar essa pasta");alert.addButton(withTitle:"Cancelar")
+        let alert=NSAlert();alert.messageText=L("Consultar a quota pelo Claude Code?")
+        alert.informativeText=L("O PlanMeter abrirá o cliente oficial para ler /usage. Ao continuar, você autoriza confirmar confiança somente na pasta vazia e exclusiva ~/Library/Application Support/PlanMeter/ClaudeProbe. Isso altera uma preferência de segurança do Claude Code. O login permanece sob controle do cliente, e a consulta não envia um pedido ao modelo.")
+        alert.addButton(withTitle:L("Ativar e autorizar essa pasta"));alert.addButton(withTitle:L("Cancelar"))
         guard alert.runModal() == .alertFirstButtonReturn else{return}
         guard claudeQuota.setConsent(true) else{return}
         claudeQuota.refresh(manual:true,setup:true)
@@ -633,7 +633,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func disableClaudeQuota() {
         guard !Runtime.isTest,!claudeQuota.busy else{return}
-        let alert=NSAlert();alert.messageText="Usar leitura passiva do Claude Code?";alert.informativeText="A consulta ativa será desativada. O login Claude permanece intacto. Na leitura passiva, Atualizar apenas relê a statusline e pode não trazer quotas recentes.";alert.addButton(withTitle:"Usar leitura passiva");alert.addButton(withTitle:"Cancelar")
+        let alert=NSAlert();alert.messageText=L("Usar leitura passiva do Claude Code?");alert.informativeText=L("A consulta ativa será desativada. O login Claude permanece intacto. Na leitura passiva, Atualizar apenas relê a statusline e pode não trazer quotas recentes.");alert.addButton(withTitle:L("Usar leitura passiva"));alert.addButton(withTitle:L("Cancelar"))
         guard alert.runModal() == .alertFirstButtonReturn,claudeQuota.setConsent(false) else{return}
         audit(.configuration,.claude,.settingsChanged,.success);startClaudeTimer();prepareAccessSettings();settingsWindow.model.accessRevision += 1;AccessSetup.guide("claude")
     }
@@ -654,17 +654,17 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func requestZai(manual: Bool) {
         guard zaiEnabled, !activity.suspended else { return }
         if zaiBusy {
-            if manual && !zaiRequestIsManual { zaiManualPending = true; zaiRefreshMessage = "Z.ai: consulta aguardando leitura em curso"; updateUI() }
+            if manual && !zaiRequestIsManual { zaiManualPending = true; zaiRefreshMessage = L("Z.ai: consulta aguardando leitura em curso"); updateUI() }
             return
         }
         if Date() < zaiManualCooldown {
             let seconds = max(1, Int(ceil(zaiManualCooldown.timeIntervalSinceNow)))
-            if manual { zaiRefreshMessage = "Z.ai: aguarde \(seconds)s para nova consulta (limite de frequência)" }
+            if manual { zaiRefreshMessage = L("Z.ai: aguarde \(seconds)s para nova consulta (limite de frequência)") }
             updateUI(); writeMetrics(); return
         }
         guard manual || (Date() >= zaiCooldown && Date() >= zaiAutomaticAfter) else { return }
         zaiBusy = true; zaiRequestIsManual = manual; zaiReads += 1
-        if manual { zaiManualRequests += 1; zaiRefreshMessage = "Z.ai: consultando o serviço…" }
+        if manual { zaiManualRequests += 1; zaiRefreshMessage = L("Z.ai: consultando o serviço…") }
         let started = Date()
         zaiGeneration += 1;let token=zaiGeneration
         zaiManualCooldown = started.addingTimeInterval(60)
@@ -679,7 +679,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.zaiBusy = false; self.zaiRequestIsManual = false; self.zaiClient = nil
                 self.audit(.queries,.zai,.query,(try? result.get()).map{$0.status == "ok"} == true ? .success : .failure)
                 guard self.allowed("zai"),!self.activity.suspended else {
-                    if manual || self.zaiManualPending { self.zaiRefreshMessage = "Z.ai: consulta interrompida pela pausa; solicite novamente ao retomar" }
+                    if manual || self.zaiManualPending { self.zaiRefreshMessage = L("Z.ai: consulta interrompida pela pausa; solicite novamente ao retomar") }
                     self.zaiManualPending = false; self.writeMetrics(); return
                 }
                 switch result {
@@ -693,8 +693,8 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         if let data = try? JSONEncoder().encode(reading) { self.writePrivate(data, to: self.zaiFile) }
                         if manual {
                             self.zaiRefreshMessage = reading.snapshot.queriedAt >= started.addingTimeInterval(-2)
-                                ? "Z.ai: coleta concluída às " + localDate(reading.snapshot.queriedAt)
-                                : "Z.ai: coleta recente reutilizada; limite de frequência do serviço"
+                                ? L("Z.ai: coleta concluída às ") + localDate(reading.snapshot.queriedAt)
+                                : L("Z.ai: coleta recente reutilizada; limite de frequência do serviço")
                         }
                     } else {
                         self.zaiError = zaiStatus(reading)
@@ -703,7 +703,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     if let data = try? JSONEncoder().encode(reading) { self.writePrivate(data,to:self.zaiFile) }
                     self.zaiCooldown = Date().addingTimeInterval(30)
                 case .failure:
-                    self.zaiError = manual ? "Consulta Z.ai falhou; confira rede e acesso ao Keychain. Quota anterior preservada" : "Consulta automática Z.ai falhou; quota anterior preservada"
+                    self.zaiError = manual ? L("Consulta Z.ai falhou; confira rede e acesso ao Keychain. Quota anterior preservada") : L("Consulta automática Z.ai falhou; quota anterior preservada")
                     if manual { self.zaiRefreshMessage = self.zaiError }
                     self.zaiCooldown = Date().addingTimeInterval(60)
                 }
@@ -714,38 +714,38 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     @objc func authorizeZai() {
         guard allowed("zai"),!Runtime.isTest,!zaiBusy else{return}
-        if KeychainStore.authorize() {audit(.access,.zai,.authorize,.success);if zaiReading?.status=="auth_unavailable" {zaiManualCooldown = .distantPast;zaiAutomaticAfter = .distantPast;saveZaiSchedule()};zaiError=nil;zaiRefreshMessage="Z.ai: acesso autorizado nesta execução";updateUI();refreshZaiNow()}
-        else {audit(.access,.zai,.authorize,.failure);let alert=NSAlert();alert.messageText="Z.ai";alert.informativeText="Acesso não autorizado. Use Configurações → Contas para tentar novamente.";alert.runModal()}
+        if KeychainStore.authorize() {audit(.access,.zai,.authorize,.success);if zaiReading?.status=="auth_unavailable" {zaiManualCooldown = .distantPast;zaiAutomaticAfter = .distantPast;saveZaiSchedule()};zaiError=nil;zaiRefreshMessage=L("Z.ai: acesso autorizado nesta execução");updateUI();refreshZaiNow()}
+        else {audit(.access,.zai,.authorize,.failure);let alert=NSAlert();alert.messageText="Z.ai";alert.informativeText=L("Acesso não autorizado. Use Configurações → Contas para tentar novamente.");alert.runModal()}
     }
     @objc func configureZai() {
         guard allowed("zai"),!Runtime.isTest, !zaiBusy else { return }
-        let alert = NSAlert(); alert.messageText = "Chave Z.ai"
-        alert.informativeText = "A chave será salva no Keychain deste Mac e usada somente para consultar quotas. Não coloque a chave no chat ou em arquivos de configuração."
+        let alert = NSAlert(); alert.messageText = L("Chave Z.ai")
+        alert.informativeText = L("A chave será salva no Keychain deste Mac e usada somente para consultar quotas. Não coloque a chave no chat ou em arquivos de configuração.")
         let field = KimiCredentialField(frame:NSRect(x:0,y:0,width:340,height:24))
         alert.window.initialFirstResponder=field
-        alert.accessoryView = field; alert.addButton(withTitle:"Salvar"); alert.addButton(withTitle:"Cancelar")
+        alert.accessoryView = field; alert.addButton(withTitle:L("Salvar")); alert.addButton(withTitle:L("Cancelar"))
         NSApp.activate(ignoringOtherApps:true)
         guard alert.runModal() == .alertFirstButtonReturn else { field.stringValue = ""; return }
         defer { field.stringValue = "" }
         do {
             try KeychainStore.save(field.stringValue.trimmingCharacters(in:.whitespacesAndNewlines))
             audit(.access,.zai,.saveKey,.success);clearZaiCache(); zaiManualCooldown = .distantPast; refreshZaiNow()
-        } catch { audit(.access,.zai,.saveKey,.failure);zaiError = (error as? QuotaError)?.text ?? "Falha ao salvar no Keychain"; updateUI();let errorAlert=NSAlert();errorAlert.messageText="Z.ai";errorAlert.informativeText=zaiError!;errorAlert.runModal() }
+        } catch { audit(.access,.zai,.saveKey,.failure);zaiError = (error as? QuotaError)?.text ?? L("Falha ao salvar no Keychain"); updateUI();let errorAlert=NSAlert();errorAlert.messageText="Z.ai";errorAlert.informativeText=zaiError!;errorAlert.runModal() }
     }
     @objc func removeZai() {
         guard !Runtime.isTest, !zaiBusy else { return }
-        let alert = NSAlert(); alert.messageText = "Remover a chave Z.ai deste Mac?"
-        alert.informativeText = "Isso remove somente o item do PlanMeter no Keychain. Não revoga a chave na Z.ai."
-        alert.addButton(withTitle:"Cancelar"); alert.addButton(withTitle:"Remover")
+        let alert = NSAlert(); alert.messageText = L("Remover a chave Z.ai deste Mac?")
+        alert.informativeText = L("Isso remove somente o item do PlanMeter no Keychain. Não revoga a chave na Z.ai.")
+        alert.addButton(withTitle:L("Cancelar")); alert.addButton(withTitle:L("Remover"))
         guard alert.runModal() == .alertSecondButtonReturn else { return }
         do { try KeychainStore.remove();audit(.access,.zai,.removeKey,.success); clearZaiCache(); updateUI() }
-        catch { audit(.access,.zai,.removeKey,.failure);zaiError = "Não foi possível remover a chave do Keychain"; updateUI() }
+        catch { audit(.access,.zai,.removeKey,.failure);zaiError = L("Não foi possível remover a chave do Keychain"); updateUI() }
     }
     func clearZaiCache() {
         zaiGeneration += 1;zaiClient?.cancel();zaiClient=nil;zaiBusy=false;zaiRequestIsManual=false;zaiManualPending=false
         zaiSnapshot = nil; zaiReading = nil; zaiRefreshMessage = nil
         zaiManualCooldown = .distantPast; zaiAutomaticAfter = .distantPast
-        zaiError = "Configure a chave Z.ai no menu para consultar quotas"
+        zaiError = L("Configure a chave Z.ai no menu para consultar quotas")
         try? FileManager.default.removeItem(at:zaiFile)
         try? FileManager.default.removeItem(at:zaiCooldownFile)
     }
@@ -781,7 +781,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     _ = self.detector.accept(value); _ = self.saveStates()
                     self.snapshot = value; self.errorText = nil; self.policy.finish(success: true)
                     if let data = try? JSONEncoder().encode(value) { self.writePrivate(data, to: self.cacheFile) }
-                case .failure(let error): self.detector.interrupt(); self.errorText = (error as? QuotaError)?.text ?? "Consulta oficial falhou"; self.policy.finish(success: false)
+                case .failure(let error): self.detector.interrupt(); self.errorText = (error as? QuotaError)?.text ?? L("Consulta oficial falhou"); self.policy.finish(success: false)
                 }
                 self.updateUI(); self.writeMetrics(); self.schedule()
             }
@@ -793,8 +793,8 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         kimi.setPaused(activity.suspended);grok.setPaused(activity.suspended)
         if activity.suspended {
             dashboard.close()
-            errorText = "Dados em cache; aguardando verificação após pausa"
-            claudeError = "Cache aguardando verificação após pausa"
+            errorText = L("Dados em cache; aguardando verificação após pausa")
+            claudeError = L("Cache aguardando verificação após pausa")
             detector.interrupt(); claudeDetector.interrupt(); timer?.invalidate(); timer = nil; claudeTimer?.invalidate(); claudeTimer = nil; zaiTimer?.invalidate(); zaiTimer = nil; client?.cancel(); zaiClient?.cancel()
             confetti.close(); shownKey = nil; writeMetrics()
         } else {
@@ -819,7 +819,7 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     static func main() {
         signal(SIGPIPE, SIG_IGN)
         if CommandLine.arguments.contains(where:{$0.hasSuffix("-self-test") && !Runtime.testModes.contains($0)}) {
-            fputs("Modo de teste desconhecido.\n",stderr);exit(2)
+            fputs(L("Modo de teste desconhecido.\n"),stderr);exit(2)
         }
         // AppKit persists status-item visibility under the bundle identity, even in tests.
         // Refuse before any NSApplication/NSStatusItem is created in a normal bundle.
@@ -829,19 +829,19 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let bundleID = Bundle.main.bundleIdentifier ?? ""
         let isolated = bundleID.hasPrefix(testPrefix) && UUID(uuidString: String(bundleID.dropFirst(testPrefix.count))) != nil
         if (isUITest && !isolated) || (isolated && !isUITest) {
-            fputs("Testes AppKit exigem pacote isolado. Use python3 tests/run-ui-tests.py.\n", stderr)
+            fputs(L("Testes AppKit exigem pacote isolado. Use python3 tests/run-ui-tests.py.\n"), stderr)
             exit(2)
         }
-        if CommandLine.arguments.contains("--self-test") { runClaudeCLIProbeTests();runClaudeCLIParserTests();runLicenseTests();runUsagePersistenceTests();runInsightModelTests();runInsightAdapterTests();runInsightRunnerTests();runHarnessDiscoveryTests();runPlanAccessTests();runUsageTimelineTests();runInsightAnalysisTests();runCardRefreshRoutingTests();runProviderRefreshTests();runOperationsTests();runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests();runCredentialPolicyTests();runGrokTests(); runLocalClientTests(); return }
+        if CommandLine.arguments.contains("--self-test") { runClaudeCLIProbeTests();runClaudeCLIParserTests();runLocalizationTests();runLicenseTests();runUsagePersistenceTests();runInsightModelTests();runInsightAdapterTests();runInsightRunnerTests();runHarnessDiscoveryTests();runPlanAccessTests();runUsageTimelineTests();runInsightAnalysisTests();runCardRefreshRoutingTests();runProviderRefreshTests();runOperationsTests();runTests(); runResetTests(); runHistoryTests(); runZaiTests(); runKimiTests();runCredentialPolicyTests();runGrokTests(); runLocalClientTests(); return }
         if CommandLine.arguments.contains("--confetti-self-test") { runConfettiTests(); return }
         if CommandLine.arguments.contains("--loop-self-test") { runLoopTests(); return }
         if CommandLine.arguments.contains("--ui-self-test") {
             guard let i = CommandLine.arguments.firstIndex(of: "--codex"), i+1 < CommandLine.arguments.count else { exit(2) }
-            runClaudeQuotaMonitorTests();runPlanAccessUITests();runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); runQuotaDashboardTests();runResetNoticeTests();runAccessTests();runSettingsTests();runRenewalHistoryUITests(); return
+            runClaudeQuotaMonitorTests();runPlanAccessUITests();runUITests(binary: CommandLine.arguments[i+1]); runZaiUITests(); runZaiRefreshTests(); runKimiMonitorTests(); runQuotaDashboardTests();runResetNoticeTests();runAccessTests();runSettingsTests();runRenewalHistoryUITests();runLocalizationUITests(); return
         }
         if CommandLine.arguments.contains("--demo-confetti") || CommandLine.arguments.contains("--demo-confetti-motion") {
             // One request to the running app: no second persistent demo app/process or model call.
-            guard NSRunningApplication.runningApplications(withBundleIdentifier: "io.github.pcarielo.planmeter").contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) else { print("Abra PlanMeter primeiro, depois use a DEMO no menu."); exit(1) }
+            guard NSRunningApplication.runningApplications(withBundleIdentifier: "io.github.pcarielo.planmeter").contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) else { print(L("Abra PlanMeter primeiro, depois use a DEMO no menu.")); exit(1) }
             DistributedNotificationCenter.default().postNotificationName(MenuApp.demoRequest, object: "io.github.pcarielo.planmeter", userInfo: ["motion": CommandLine.arguments.contains("--demo-confetti-motion")], deliverImmediately: true)
             return
         }
@@ -853,16 +853,16 @@ final class MenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if CommandLine.arguments.contains("--refresh-zai-now") {
             guard NSRunningApplication.runningApplications(withBundleIdentifier: "io.github.pcarielo.planmeter").contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) else { exit(1) }
             DistributedNotificationCenter.default().postNotificationName(MenuApp.zaiRefreshRequest, object: "io.github.pcarielo.planmeter", userInfo: nil, deliverImmediately: true)
-            print("Solicitação Z.ai enviada ao monitor; confirme o resultado nas métricas/menu.")
+            print(L("Solicitação Z.ai enviada ao monitor; confirme o resultado nas métricas/menu."))
             return
         }
         if CommandLine.arguments.contains("--diagnostic") {
             let args = CommandLine.arguments
             let binary = args.firstIndex(of: "--codex").flatMap { $0+1 < args.count ? args[$0+1] : nil } ?? Runtime.codexPath()
             let client = AppServerClient(binary: binary), start = Date()
-            do { let s = try client.read(); print("Consulta: \(localDate(s.queriedAt)); restante: \(percentLabel(s.remaining)); quotaRequests=\(client.quotaRequests); elapsed=\(String(format:"%.3f",Date().timeIntervalSince(start)))s")
+            do { let s = try client.read(); print(L("Consulta: \(localDate(s.queriedAt)); restante: \(percentLabel(s.remaining)); quotaRequests=\(client.quotaRequests); elapsed=\(String(format:"%.3f",Date().timeIntervalSince(start)))s"))
                 for w in s.windows { print("\(w.name): \(durationLabel(w.durationMinutes)); \(percentLabel(w.remaining))") }
-            } catch { print((error as? QuotaError)?.text ?? "Consulta oficial falhou"); exit(1) }; return
+            } catch { print((error as? QuotaError)?.text ?? L("Consulta oficial falhou")); exit(1) }; return
         }
         let app = NSApplication.shared, delegate = MenuApp(); app.delegate = delegate
         withExtendedLifetime(delegate) { app.run() }
