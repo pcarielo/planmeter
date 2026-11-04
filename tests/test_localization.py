@@ -24,6 +24,16 @@ class CatalogTests(unittest.TestCase):
                     self.assertIsInstance(value,str)
                     self.assertTrue(value.strip())
                     self.assertEqual(sorted(PLACEHOLDER.findall(key)),sorted(PLACEHOLDER.findall(value)))
+    def test_embedded_instruction_json_keeps_protocol_fields(self):
+        folder=ROOT/'app/Resources/Locales'
+        for code in LANGUAGES:
+            for key,value in self.load(folder/(code+'.json')).items():
+                if not key.startswith('{"task":'):continue
+                with self.subTest(language=code,key=key):
+                    original=json.loads(key);translated=json.loads(value)
+                    self.assertEqual(set(translated),set(original))
+                    self.assertIsInstance(translated['task'],str)
+                    if 'summary' in original['task']:self.assertIn('summary',translated['task'])
     def test_english_fallback_and_portuguese_source(self):
         folder=ROOT/'app/Resources/Locales'
         english=self.load(folder/'en.json')
